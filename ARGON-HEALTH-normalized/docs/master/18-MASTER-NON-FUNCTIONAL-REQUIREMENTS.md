@@ -1,7 +1,7 @@
 # 18 — MASTER NON-FUNCTIONAL REQUIREMENTS
 
-**STATUS:** TARGET ARCHITECTURE / PROPOSED
-**EVIDENCE CLASS:** DESIGN
+STATUS: PROPOSED
+EVIDENCE CLASS: DESIGN
 
 ## Status
 TARGET ARCHITECTURE / PROPOSED. Every figure below is an aspirational
@@ -54,8 +54,7 @@ For every service boundary defined in `06`'s API conventions, track:
 - **DB latency** and **DB saturation** (connection pool utilization).
 - **Cache hit rate** (Redis) — a falling hit rate is itself a signal, not
   just a performance detail.
-- **Queue latency** (Pub/Sub primary; RabbitMQ where a conditional AMQP
-  adapter is in use — ADR-016) — time from publish to successful
+- **Queue latency** (RabbitMQ) — time from publish to successful
   consumption.
 - **Cold start** — Cloud Run cold-start latency distribution (`13`).
 - **External integration latency** — per-adapter, since these are the

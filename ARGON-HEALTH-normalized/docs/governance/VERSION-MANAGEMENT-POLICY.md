@@ -1,85 +1,136 @@
-# Version Management Policy
+# VERSION MANAGEMENT POLICY
 
-**STATUS:** ACTIVE (governance policy)
-**EVIDENCE CLASS:** DESIGN
+STATUS: PROPOSED
+EVIDENCE CLASS: DESIGN
+
+## Status
+GOVERNANCE RECORD. Dated 2026-08-27. Policy definition only — no
+implementation (dependency-lock files, CI enforcement) exists yet; this
+is the target policy those future artifacts must satisfy.
 
 ## Purpose
-Define how ARGON tracks, patches, upgrades, and eventually retires the
-technology versions named in `docs/master/14-MASTER-TECHNOLOGY-STACK.md`,
-so "the architecture says Java 25" never quietly becomes "the codebase
-is pinned to whatever Java 25 patch happened to be current the day
-someone ran an install command."
+Define how ARGON tracks, updates, and retires dependency versions —
+separating what `14-MASTER-TECHNOLOGY-STACK.md` states as a baseline
+*target* from what an actual build locks as an exact *patch* version, per
+the Managed Upgrade Policy already introduced there.
 
-## Core Rule
-**Architecture documents specify a baseline; implementation pins an
-exact version.** `docs/master/14` may say "Java 25 LTS" or "Spring Boot
-4.1.x" — that is a target, not a build-file value. The first time actual
-code exists, a `build.gradle`/`package.json`/lockfile pins an exact
-version (e.g., `25.0.3`, `4.1.1`), and **that pin, not the architecture
-document, is what a build actually uses.**
+## Scope
+Covers every dependency category in `14`: language runtime, frameworks,
+database, frontend, messaging, IaC, and interoperability/terminology
+libraries. Does not cover business-logic versioning (API versioning is
+`06`'s concern; ADR status versioning is `19`'s).
 
-**"latest" is never a production dependency version.** Every pin is
-exact, every time, everywhere a version is written into a build/deploy
-artifact.
+## Policy
 
-## Supported Versions
-| Layer | Supported line | Notes |
-|---|---|---|
-| Java | Current LTS per `14` (Java 25 as of this pass) | Track Oracle/OpenJDK LTS release cadence; move to next LTS before the current one's free-patch window (NFTC) closes |
-| Spring Boot / Framework | Current major.minor per `14` | Move within 1 minor version of latest within a normal release cycle |
-| PostgreSQL | Current major per `14` | Track major-version EOL; plan the next major upgrade before EOL, not at it |
-| Frontend (Next.js, React Native) | Current major per `14` | Frontend deps track faster; patch continuously, evaluate major bumps quarterly |
-| IaC (OpenTofu) | Current stable | Track state-format compatibility notes on every upgrade |
+### Supported Version Window
+- **Language runtime (Java):** track the current LTS and, at most, the
+  immediately prior LTS. Per
+  `docs/evidence/TECHNOLOGY-BASELINE-VERIFICATION.md` §1, this means
+  Java 25 LTS (adopted) with Java 21 LTS as the only acceptable fallback
+  if a specific dependency has not yet certified Java 25 — never older
+  than N-1 LTS.
+- **Application framework (Spring Boot):** track only lines within
+  official OSS support (per `14`, currently 4.0.x and 4.1.x) — a line
+  past its OSS-support end is treated as a security risk, not a stable
+  choice, per the EOL evidence in
+  `docs/evidence/TECHNOLOGY-BASELINE-VERIFICATION.md` §2.
+- **Database (PostgreSQL):** track the current major version (18.x);
+  never run a major version past its official fix-support end date (e.g.,
+  PostgreSQL 14's November 12, 2026 end-of-fixes date, found during
+  verification, is a concrete example of the kind of deadline this
+  policy exists to track).
+- **Frontend (Next.js, React Native):** track the current Active-LTS-
+  equivalent line; React Native's own "latest 3 minor lines supported"
+  policy is adopted as-is rather than ARGON inventing a stricter one.
+- **Everything else:** default to "within the upstream project's own
+  official support window," re-checked at each Technology Baseline
+  Verification cycle (see Revisit Trigger below).
 
-## Patch Policy
-- **Security patches:** applied on the vendor's release cadence, not
-  batched with feature work. A security patch is never delayed to "the
-  next planned release" once a fix is available and verified compatible.
-- **Routine patches:** batched on a regular cadence (recommended:
-  monthly), verified against the existing test suite before promotion.
+### Security Patch SLA
+Exact numeric SLA (e.g., "critical CVEs patched within N business days")
+is **UNKNOWN — REQUIRES a real decision from whoever owns this project's
+operational capacity**; inventing a specific number here would violate
+Zero Fabrication. The **process**, once that number is set, is:
+1. Automated dependency/CVE scanning (SAST/dependency-scanning per `07`)
+   flags a new advisory.
+2. Severity triaged (Critical/High/Medium/Low) using the upstream
+   project's own CVSS scoring.
+3. Critical/High findings get prioritized ahead of any non-security
+   roadmap work (`20`); a fix or mitigation ships through the normal
+   Release workflow (`05` §12), potentially fast-tracked past a full wave
+   sequence for a Critical finding with active exploitation evidence.
+4. Every patch (security or otherwise) is logged, feeding
+   `08-MASTER-COMPLIANCE-MAP.md`'s evidence trail where a compliance
+   control depends on patch currency.
 
-## Upgrade Windows
-- **Minor/patch upgrades:** go through the same compatibility-validation
-  step as any other release (`docs/master/05` §12 Release workflow —
-  canary → staged wave rollout).
-- **Major upgrades:** require an explicit compatibility-validation pass
-  plus a rollback plan before starting, consistent with
-  `docs/master/17-MASTER-DISASTER-RECOVERY.md`'s restore-test discipline
-  applied to code, not just data.
+### Dependency Updates
+- Patch-level updates: applied on a regular, non-disruptive cadence
+  (automated PR + CI + fast review), consistent with `14`'s "patch
+  versions are never frozen blindly" principle.
+- Minor-level updates: reviewed against the changelog, applied within a
+  normal sprint/release cycle.
+- Major-level updates: treated as an architecture-affecting change,
+  requiring the same compatibility-validation gate as any other Release
+  workflow change (`05` §12) and, if the major version changes a
+  documented target in `14`, a new ADR (`19`) rather than a silent bump.
 
-## Dependency Update Automation
-Not yet implemented — no codebase exists. Recommended for Foundation
-Implementation: automated dependency-update tooling (e.g., Renovate or
-Dependabot) configured to open patch/security updates automatically and
-gate minor/major updates behind the compatibility-validation step above.
-Marked here as a Foundation Implementation requirement, not fabricated
-as already running.
+### Breaking Upgrade Process
+1. Identify the breaking change via the upstream changelog/migration
+   guide.
+2. Assess impact against the module boundaries in `03`/Spring Modulith
+   (`14`) — a breaking change contained to one module is lower-risk than
+   one crossing module boundaries.
+3. Run the full contract-test suite (`15`) before merging.
+4. Ship through canary → waves (`05` §12), never a direct 100% rollout.
+5. Update the relevant `docs/master/` document and, if the decision
+   itself changed (not just the version number), add an ADR (`19`).
 
-## Breaking-Change Procedure
-1. Identify the breaking change and its blast radius (which modules/
-   domains from `docs/master/03` are affected).
-2. File or update an ADR if the change alters a platform-wide decision
-   (see `docs/governance/ARGON-SOURCE-OF-TRUTH.md` §6).
-3. Run compatibility validation in an isolated environment before any
-   production-adjacent rollout, per `argon-governance` skill's core
-   principle of isolated-project testing.
-4. Roll out via the staged wave pattern (`docs/master/05` Release Flow),
-   never a single-shot deploy, once real production traffic exists.
+### Rollback
+Follows the Release Rollback workflow (`05` Tier 2) and the per-component
+DR register (`17`) — a dependency upgrade rollback is not a special case,
+it's a normal release rollback.
 
-## Compatibility Testing
-Every version bump — patch or major — runs the existing automated test
-pyramid (`docs/master/15-MASTER-TESTING-STRATEGY.md`) before promotion.
-No version bump ships on the assumption that "it's just a patch."
+### Compatibility Testing
+Owned by `15-MASTER-TESTING-STRATEGY.md`'s Contract test layer —
+dependency upgrades are exactly the class of change contract tests exist
+to catch before they reach a release wave.
 
-## Rollback
-Every upgrade has a stated rollback path before it starts, consistent
-with the pre-deploy checklist in the `argon-governance` skill
-(`references/no-breaking-changes.md`): "rollback plan written down
-before deploy" is not optional.
+### End-of-Life Monitoring
+- Every dependency in `14`'s tables gets its official EOL/support-window
+  date tracked (source: the vendor's own published policy — e.g., the
+  PostgreSQL versioning policy, the Spring Boot OSS-support-window policy,
+  Oracle's Java SE support roadmap, all cited with dates in
+  `docs/evidence/TECHNOLOGY-BASELINE-VERIFICATION.md`).
+- A dependency approaching its EOL date within a defined lead time (exact
+  lead time TBD — same Zero-Fabrication caveat as the Security Patch SLA
+  above) triggers a scheduled upgrade task, not a reactive scramble.
+- This tracking can be automated in the future via an EOL-tracking
+  service/API (e.g., the kind of aggregator used during this
+  verification pass) — TARGET, not yet implemented.
 
-## EOL Monitoring
-No automated EOL monitoring exists yet (no codebase to monitor).
-Recommended for Foundation Implementation: a recurring check (manual or
-automated) against each pinned dependency's published EOL/support
-timeline, feeding back into `docs/evidence/TECHNOLOGY-BASELINE-VERIFICATION.md`
-on roughly the same 3–6 month cadence recommended there.
+## Alternatives Considered
+- **Freezing exact versions in the architecture documents themselves**
+  (rejected) — this is precisely what `14`'s Managed Upgrade Policy
+  already rejects; this document operationalizes that principle rather
+  than reversing it.
+- **Inventing a specific SLA number to look complete** (rejected) — would
+  violate Zero Fabrication; an honest "REQUIRES a real decision" is
+  preferred over a plausible-looking fake number, consistent with how
+  `17`'s RPO/RTO targets were handled.
+
+## Dependencies
+Depends on `14`, `05` §12, `15`, `17`, `07`. Feeds
+`docs/governance/ARCHITECTURE-STATUS.md` (EOL tracking becomes a status
+input once implemented).
+
+## Unknowns
+UNKNOWN — the exact Security Patch SLA and EOL lead-time numbers, pending
+a real operational-capacity decision. UNKNOWN — whether any automated
+dependency-scanning or EOL-tracking tooling currently exists in any
+environment for this project.
+
+## Definition of Done
+Every dependency named in `14-MASTER-TECHNOLOGY-STACK.md` has a
+documented supported-version-window rule above (directly or via the
+"everything else" default), and no dependency is left with an undefined
+upgrade path.

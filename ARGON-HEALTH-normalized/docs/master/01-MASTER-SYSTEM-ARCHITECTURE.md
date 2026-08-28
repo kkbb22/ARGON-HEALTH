@@ -1,7 +1,7 @@
 # 01 — MASTER SYSTEM ARCHITECTURE
 
-**STATUS:** TARGET ARCHITECTURE / PROPOSED
-**EVIDENCE CLASS:** DESIGN
+STATUS: PROPOSED
+EVIDENCE CLASS: DESIGN
 
 ## Status
 TARGET ARCHITECTURE / PROPOSED. Not implemented. Not production. No repository
@@ -50,8 +50,7 @@ ARGON is decomposed into three planes plus one cross-cutting boundary:
   Org Provisioning          Clinical                   PostgreSQL (OLTP)
   Licensing                 Pharmacy                    Redis (cache/queue)
   Releases                  Laboratory                  Object Storage (docs/DICOM)
-  Maintenance                Radiology                   Messaging (Pub/Sub primary;
-                                                          RabbitMQ conditional — ADR-016)
+  Maintenance                Radiology                   Messaging (RabbitMQ)
   Configuration              Hospital Ops                Search
   Security Ops               Billing                     Analytics / Warehouse
   Compliance Evidence        Insurance

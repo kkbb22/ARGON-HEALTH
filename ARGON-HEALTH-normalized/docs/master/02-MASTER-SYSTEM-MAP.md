@@ -1,7 +1,7 @@
 # 02 — MASTER SYSTEM MAP
 
-**STATUS:** TARGET ARCHITECTURE / PROPOSED
-**EVIDENCE CLASS:** DESIGN
+STATUS: PROPOSED
+EVIDENCE CLASS: DESIGN
 
 ## Status
 TARGET ARCHITECTURE / PROPOSED.
@@ -53,13 +53,12 @@ DATA PLANE
  ├─ PostgreSQL (system of record — OLTP)
  ├─ Redis (cache, session, queue — never source of truth)
  ├─ Object Storage (documents, DICOM instances, backups)
- ├─ Messaging / Google Cloud Pub/Sub (event backbone, outbox relay;
- │    RabbitMQ retained CONDITIONAL for AMQP-only external adapters — ADR-016)
+ ├─ Messaging / RabbitMQ (event backbone, outbox relay)
  ├─ Search Index (operational search, not clinical truth)
  └─ Analytics Warehouse (read-optimized, fed by events — never written to directly)
 
 INTEROPERABILITY LAYER
- ├─ FHIR Gateway (R5 baseline, R4/R4B compatibility)
+ ├─ FHIR Gateway (R4/R4B production baseline, R5 optional — corrected 2026-08-27)
  ├─ HL7 v2 Adapter (ADT/ORM/ORU/MDM)
  ├─ DICOM / DICOMweb Gateway
  ├─ IHE Profile Adapters (XDS, PIX/PDQ, XCA, XCPD)

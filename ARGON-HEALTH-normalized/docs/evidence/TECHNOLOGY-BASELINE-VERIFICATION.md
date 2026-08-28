@@ -1,7 +1,7 @@
 # TECHNOLOGY BASELINE VERIFICATION
 
-**STATUS:** EVIDENCE RECORD
-**EVIDENCE CLASS:** EXTERNAL RESEARCH (live web research, not a formal published standard; superseded by any later verification pass)
+STATUS: PROPOSED
+EVIDENCE CLASS: EXTERNAL STANDARD (live-researched vendor/standards sources, 2026-08-27)
 
 ## Status
 EVIDENCE RECORD. This document supersedes any prior technology claim made

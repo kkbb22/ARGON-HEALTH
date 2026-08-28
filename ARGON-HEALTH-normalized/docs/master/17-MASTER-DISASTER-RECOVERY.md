@@ -1,7 +1,7 @@
 # 17 — MASTER DISASTER RECOVERY
 
-**STATUS:** TARGET ARCHITECTURE / PROPOSED
-**EVIDENCE CLASS:** DESIGN
+STATUS: PROPOSED
+EVIDENCE CLASS: DESIGN
 
 ## Status
 TARGET ARCHITECTURE / PROPOSED.
@@ -13,7 +13,7 @@ actually been tested successfully.
 
 ## Scope
 Covers every stateful component in the Data Plane (`04`) plus
-platform-critical state (OpenTofu state, configuration, secrets). Full
+platform-critical state (Terraform state, configuration, secrets). Full
 mechanics of the Disaster Recovery *workflow* (the human/operational
 sequence when a real incident occurs) are defined in `05-MASTER-WORKFLOW-MAP.md`
 Tier 2; this document defines the per-component targets that workflow
@@ -36,10 +36,9 @@ UNKNOWN — REQUIRES EVIDENCE (see `01`).
 |---|---|---|---|---|---|---|
 | PostgreSQL (Cloud SQL) | Continuous WAL archiving + PITR + scheduled full backups | Near-zero via PITR (exact target TBD — requires business continuity sign-off) | TBD — requires sign-off | Scheduled restore drill (frequency TBD) | Managed HA failover (`13`) | Platform-ops / DBA role |
 | Keycloak DB | Same PostgreSQL mechanism as above (if co-located) or its own PITR-backed instance | Near-zero via PITR | TBD | Same cadence as PostgreSQL | Managed HA failover | Platform-ops |
-| Google Cloud Pub/Sub (primary event backbone — ADR-016) | Provider-managed replication; at-least-once delivery with dead-letter topics | Near-zero (provider-managed); max 31-day retention ceiling | TBD | Scheduled dead-letter/redelivery drill | Provider-managed, no cluster to fail over | Platform-ops |
-| RabbitMQ (CONDITIONAL — AMQP-only external adapters, ADR-016) | Mirrored/quorum queues + periodic definition export, where deployed | Depends on queue durability config — REQUIRES definition | TBD | Scheduled failover drill (only if/when an adapter actually uses RabbitMQ) | Cluster-level failover | Platform-ops |
+| RabbitMQ | Mirrored/quorum queues + periodic definition export | Depends on queue durability config — REQUIRES definition | TBD | Scheduled failover drill | Cluster-level failover | Platform-ops |
 | Object Storage (Cloud Storage) | Multi-region replication + versioning/lifecycle policy | Near-zero (provider-managed durability) | TBD | Scheduled retrieval-integrity drill | Provider-managed | Platform-ops |
-| OpenTofu State (ADR-017, replaces Terraform state) | Remote state backend with versioning + locking, native state encryption | N/A (config, not runtime data) | TBD | State-restore drill before any major infra change | N/A | Infrastructure lead |
+| Terraform State | Remote state backend with versioning + locking | N/A (config, not runtime data) | TBD | State-restore drill before any major infra change | N/A | Infrastructure lead |
 | Configuration (`Platform` domain, `03`) | Versioned in the Configuration Hierarchy itself (`04`) + exported snapshots | Near-zero (every change already versioned) | TBD | Config-restore drill | N/A | Platform-ops |
 | Critical Secrets (Secret Manager / KMS) | Provider-managed replication + documented recovery procedure | Near-zero (provider-managed) | TBD | Secret-recovery drill (access-path test, not secret-value exposure) | Provider-managed | Security lead |
 

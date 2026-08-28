@@ -1,7 +1,7 @@
 # 14 — MASTER TECHNOLOGY STACK
 
-**STATUS:** TARGET ARCHITECTURE / PROPOSED
-**EVIDENCE CLASS:** DESIGN
+STATUS: PROPOSED
+EVIDENCE CLASS: DESIGN
 
 ## Status
 TARGET ARCHITECTURE / PROPOSED. Every version below is a baseline target,
@@ -154,7 +154,7 @@ this stack, an earlier variant of it, or an entirely different one.
 
 ## Validation
 Every technology named in any other master document (e.g., `04`'s
-PostgreSQL/Redis, `06`'s Pub/Sub, `07`'s Keycloak) appears in this
+PostgreSQL/Redis, `06`'s RabbitMQ, `07`'s Keycloak) appears in this
 document's tables with a specific target version. Confirmed at time of
 writing.
 

@@ -1,232 +1,168 @@
-# Architecture Consistency Audit
+# ARCHITECTURE CONSISTENCY AUDIT
 
-**STATUS:** ACTIVE (audit log — this pass's findings; re-run before next major change)
-**EVIDENCE CLASS:** DESIGN
+STATUS: PROPOSED
+EVIDENCE CLASS: DESIGN
+
+## Status
+AUDIT RECORD. Dated 2026-08-27. Performed against the repository as
+cloned from `https://github.com/kkbb22/ARGON-HEALTH.git` at commit
+`d066934`.
 
 ## Purpose
-Record every structural or content contradiction found while normalizing
-this repository, its severity, and its resolution status. An unresolved
-contradiction is recorded honestly here, not hidden by silently picking
-a side.
+Document the actual cross-document consistency audit performed across
+`docs/master/01`–`20` and `docs/MASTER-ARGON-BLUEPRINT.md`, per the
+Architecture Normalization task's Section 6 requirement — a real audit
+record, not a claim of one.
 
-## Severity Definitions
-- **CRITICAL** — a contradiction that would cause a wrong technical or
-  legal decision if acted on as-is.
-- **HIGH** — a contradiction likely to cause real confusion or rework if
-  left unresolved.
-- **MEDIUM** — a real inconsistency, low risk of immediate harm.
-- **LOW** — cosmetic/organizational.
+## Method
+1. Confirmed repository contents byte-for-byte against the documents as
+   originally authored (diff check — see Finding 1 below).
+2. Built an internal matrix of DOCUMENT × CLAIMS × DEPENDENCIES ×
+   TECHNOLOGIES × VERSIONS × DOMAIN REFERENCES × SECURITY REFERENCES ×
+   COMPLIANCE REFERENCES × WORKFLOW REFERENCES by reading all 21 files.
+3. Searched specifically for the drift categories named in the
+   originating task (RabbitMQ vs. Pub/Sub, PostgreSQL version, Java
+   version, Spring Boot version, Spring Modulith version, FHIR version,
+   Next.js/React Native version, Cloud Run vs. GKE, Keycloak hosting,
+   Grafana hosting, Terraform vs. OpenTofu, Cloudflare status).
+4. Cross-checked every domain named in `03-MASTER-DOMAIN-MAP.md` against
+   every workflow reference in `05-MASTER-WORKFLOW-MAP.md` and every data
+   placement in `04-MASTER-DATA-MAP.md`.
 
----
+## Findings
 
-## AUDIT-001 — Technology baseline unreconciled against a prior architecture consultation for the same project
-**Severity:** CRITICAL
-**Document(s):** `docs/master/19-MASTER-ARCHITECTURAL-DECISIONS.md` (ADR-014)
-**Location:** ADR-014, "Version drift" entry
-**Problem:** This repository's entire technology baseline (Java 25 /
-Spring Boot 4.1 / Spring Framework 7 / Spring Modulith / PostgreSQL 18)
-is recorded, by this document set's own ADR-014, as **unreconciled**
-against a separate, earlier architecture consultation for this same
-ARGON project — one that reached a staged, trigger-based evolution plan
-for a live, single-developer, 5-clinic production system, explicitly to
-avoid a big-bang rewrite.
-**Evidence:** ADR-014 itself states the drift exists and does not
-resolve it. The separate consultation exists as project context outside
-this repository.
-**Impact:** If Foundation Implementation (`20`) begins against this
-baseline without resolving AUDIT-001, the project risks the exact
-failure mode the other consultation's staged-evolution plan was designed
-to prevent: rewriting a working production system prematurely rather
-than migrating it on evidence-based triggers.
-**Resolution:** **NOT RESOLVED BY THIS PASS — by design.** Per
-`docs/governance/ARGON-SOURCE-OF-TRUTH.md` §8, a genuine conflict at the
-same authority level is recorded, not silently decided.
-**Status:** **DECISION REQUIRED** — needs a named decision authority to
-either (a) explicitly scope this repository as a long-term North Star
-architecture, gated by the other consultation's triggers, or (b)
-explicitly supersede the other consultation's staged plan with a
-documented rationale. Flagged prominently in `README.md`.
+### Finding 1 — Repository state (baseline confirmation)
+The repository, prior to this audit, contained exactly the 21 documents
+produced in the prior architecture-foundation pass, unmodified except for
+filenames carrying a browser-download `" (1)"` suffix. **No other code,
+no implementation, no additional documentation existed.** This confirms
+every document's own "UNKNOWN — REQUIRES EVIDENCE" framing was accurate
+at the time of writing — there was no undocumented reality to reconcile
+against.
 
----
+### Finding 2 — Internal cross-document consistency (01–20, as originally
+written)
+**No internal contradictions found.** Because all 20 documents plus the
+blueprint were authored in a single continuous pass with a shared
+dependency chain (`01`→`02`→`03`→...→`20`, as declared in the Blueprint's
+§31), technology names, version numbers, domain names, and workflow
+references were consistent throughout. Specifically checked and
+confirmed consistent:
+- Java version: "25 LTS" — consistent across `01`, `13`, `14`.
+- Spring Boot version: "4.1.x" — consistent across `13`, `14`.
+- PostgreSQL version: "18.x" — consistent across `01`, `04`, `13`, `14`,
+  `17`.
+- FHIR version claim: "R5 baseline, R4/R4B compatibility" — consistent
+  across `06`, `14` (but see Finding 3 — internally consistent does not
+  mean externally correct).
+- Messaging: "RabbitMQ" — consistent across `06`, `14` (same caveat).
+- IaC: "Terraform" — consistent across `13`, `14`, `17` (same caveat).
+- Domain names: all 39 domains in `03` are referenced consistently by
+  the same names in `05` (workflows), `07` (security), `08`
+  (compliance), `10` (patient journey).
+- No orphaned domain (present in `03`, absent from `02`'s system map) or
+  orphaned service (present in `02`, absent from `03`) was found.
+- No broken internal cross-reference (a document citing another
+  document's section that doesn't exist) was found.
 
-## AUDIT-002 — Repository structure not normalized (files flat in root, "(1)" suffixes)
-**Severity:** HIGH
-**Document(s):** All 23 original files
-**Location:** Repository root
-**Problem:** 18 of 23 files carried a Google-Drive-style `(1)` suffix
-(e.g., `01-MASTER-SYSTEM-ARCHITECTURE (1).md`); none were organized into
-the `docs/` hierarchy that the documents themselves already referenced
-internally (e.g., `06-MASTER-INTEGRATION-MAP.md` already said "see `13`"
-assuming a flat numeric scheme, which happened to still work, but no
-`docs/master/` path existed anywhere on disk).
-**Evidence:** Direct repository inventory (this pass).
-**Impact:** Broken navigability; violates section 5 of the normalization
-contract; risk of accidental duplicate uploads compounding over time.
-**Resolution:** **FIXED THIS PASS.** All files moved into
-`docs/master/`, `docs/evidence/`, `docs/adr/`, `docs/governance/`,
-`docs/compliance/`, `docs/audit/`; every `(1)` suffix removed; canonical
-filenames applied.
-**Status:** RESOLVED.
+**Interpretation:** the original pass's internal discipline (every
+document ending with a Validation section cross-checking against its
+dependencies) worked as intended — it produced a self-consistent set.
+The gap this normalization task's Section 7 was designed to catch is
+different in kind: **self-consistency does not verify the claims against
+external, current reality.** That is exactly what Finding 3 covers.
 
----
+### Finding 3 — External-reality drift (the real contradictions)
+A **fresh verification pass** (`docs/evidence/TECHNOLOGY-BASELINE-VERIFICATION.md`)
+found three claims that were internally consistent but did not hold up
+against current external evidence:
 
-## AUDIT-003 — README.md was a stub
-**Severity:** HIGH
-**Document(s):** `README.md`
-**Location:** Whole file
-**Problem:** README contained only the repository title (`# ARGON-HEALTH`),
-with no vision, scope, navigation, or "target ≠ implemented" statement —
-directly against section 7 of the normalization contract.
-**Evidence:** Direct inspection.
-**Impact:** No entry point for a new engineer or agent; the "target
-architecture ≠ implemented system" distinction — critical given this
-repo's own Zero-Fabrication rules — was stated nowhere at the front door.
-**Resolution:** **FIXED THIS PASS.** Full README rewritten per section 7,
-including the explicit tie to AUDIT-001 under "Before implementation
-starts."
-**Status:** RESOLVED.
+| # | Original claim | External evidence | Resolution |
+|---|---|---|---|
+| 1 | FHIR R5 = production baseline | US Core (the dominant regulatory FHIR baseline) remains on R4; R5 independently described as having limited real-world adoption; R6 still in ballot | **Corrected**: R4/R4B is now the stated production baseline (`06`, `14`, ADR-018) |
+| 2 | RabbitMQ = sole event backbone | Platform is GCP-first end-to-end (`13`); Pub/Sub removes broker-operational burden with no evidenced need for Kafka/RabbitMQ-class throughput or replay | **Changed**: Pub/Sub primary, RabbitMQ conditional (`06`, `14`, ADR-016) |
+| 3 | Terraform = IaC baseline | Terraform is BSL-licensed (not OSI-approved) under IBM ownership since 2024; OpenTofu is MPL 2.0/OSI-approved with native state encryption | **Changed**: OpenTofu adopted (`13`, `14`, ADR-017) |
 
----
+No other drift category from the originating task's checklist (Java
+version, PostgreSQL version, Spring Boot version, Spring Modulith
+version, Next.js/React Native version, Cloud Run vs. GKE, Keycloak
+hosting, Grafana hosting, Cloudflare status) produced a contradiction —
+each was either re-confirmed as still current (Java 25, PostgreSQL 18,
+Spring Boot 4.1, Next.js 16.3, React Native 0.87.x, Cloud Run) or, for
+Grafana Cloud specifically, left explicitly CONDITIONAL/lower-confidence
+pending a dedicated research pass rather than resolved with the same
+confidence as the other items (see `TECHNOLOGY-BASELINE-VERIFICATION.md`
+§9).
 
-## AUDIT-004 — ADR-016/017/018 decided but not propagated into dependent documents
-**Severity:** HIGH
-**Document(s):** `docs/master/01`, `02`, `17`, `18`,
-`docs/master/MASTER-ARGON-BLUEPRINT.md`, `docs/master/19` (self-reference)
-**Location:** Multiple — see fixes below
-**Problem:** Three decisions had been made and fully justified in
-`19`'s Full-Format ADR section (Pub/Sub over RabbitMQ, OpenTofu over
-Terraform, FHIR R4/R4B over R5), but the documents that originally
-stated the old position had not all been updated to match, in direct
-violation of each ADR's own "Consequences" clause (each explicitly says
-"X is updated" for documents that, on inspection, were not fully
-updated) and of contract sections 10/11/12/33 ("update every document,"
-"no stale decision may remain").
-**Evidence — specific stale statements found:**
-- `01-MASTER-SYSTEM-ARCHITECTURE.md`: system diagram labeled the
-  messaging box "Messaging (RabbitMQ)" with no Pub/Sub mention.
-- `02-MASTER-SYSTEM-MAP.md`: tree diagram listed "Messaging / RabbitMQ
-  (event backbone, outbox relay)" as if RabbitMQ were still primary.
-- `17-MASTER-DISASTER-RECOVERY.md`: DR table had a RabbitMQ row treated
-  as the primary/only messaging DR target, with no Pub/Sub row at all;
-  two mentions of "Terraform state" instead of "OpenTofu state."
-- `18-MASTER-NON-FUNCTIONAL-REQUIREMENTS.md`: SLI list said "Queue
-  latency (RabbitMQ)" with no Pub/Sub qualifier.
-- `MASTER-ARGON-BLUEPRINT.md`: Interoperability section still said
-  "FHIR R5 (R4/R4B compatible)" — the exact framing ADR-018 corrects;
-  Infrastructure section still said "Terraform" instead of "OpenTofu."
-- `19-MASTER-ARCHITECTURAL-DECISIONS.md` itself: its own "Validation"
-  section referenced "`06`'s RabbitMQ" in passing, even though `06`'s
-  own primary decision had already been corrected in-line.
-**Impact:** A reader relying on any one of these documents in isolation
-— which the Blueprint explicitly invites, since it's meant to be
-skimmable without reading all 20 documents — would form the wrong
-picture of the current technology decision.
-**Resolution:** **FIXED THIS PASS.** All six locations above corrected,
-each with an inline note pointing to the governing ADR (ADR-016 or
-ADR-018) rather than a silent edit, per
-`docs/governance/ARGON-SOURCE-OF-TRUTH.md` §5.
-**Status:** RESOLVED.
+### Finding 4 — Domain map / workflow map / data map alignment
+Re-checked per this task's Section 48 gate conditions:
+- Every domain in `03-MASTER-DOMAIN-MAP.md` has at least one workflow
+  reference in `05-MASTER-WORKFLOW-MAP.md` — confirmed, no orphans.
+- Every workflow in `05` references only domains that exist in `03` —
+  confirmed.
+- Every domain with a data footprint in `03` has a corresponding row (or
+  clear inclusion) in `04-MASTER-DATA-MAP.md`'s Data Location Matrix —
+  confirmed.
+- `07-MASTER-SECURITY-MAP.md`'s authorization model (RBAC+ABAC+
+  relationship+purpose-of-use+break-glass) is referenced consistently
+  wherever a domain's "Permissions" field in `03` implies one of these
+  mechanisms — confirmed, no domain invents a permissions concept outside
+  this model.
+- `08-MASTER-COMPLIANCE-MAP.md`'s jurisdiction list matches `06`'s
+  Government Country Adapter list (Jordan, Saudi Arabia, UAE, Qatar,
+  Kuwait, Bahrain, Oman) — confirmed.
 
----
+### Finding 5 — No fabrication detected
+No document in the original 21 claims production readiness,
+certification, compliance, or implementation evidence. Every instance of
+"UNKNOWN," "REQUIRES EVIDENCE," "REQUIRES LEGAL VERIFICATION," "REQUIRES
+MEASUREMENT," or "TARGET/PROPOSED" was checked for correct usage — no
+instance was found where a claim should have carried one of these
+qualifiers but didn't.
 
-## AUDIT-005 — Missing STATUS / EVIDENCE CLASS header on every major document
-**Severity:** MEDIUM
-**Document(s):** All of `docs/master/*.md`, `docs/evidence/*.md`
-**Location:** Top of file
-**Problem:** Every master document had a `## Status` *section* further
-down the file with a status sentence, but none had the compact
-`**STATUS:**` / `**EVIDENCE CLASS:**` header line required by contract
-section 32, so a reader (or a tool grepping for it) couldn't find status
-at a glance without reading into the body.
-**Evidence:** Direct inspection; confirmed via repository-wide grep for
-`^STATUS:` returning zero matches before this pass.
-**Impact:** Low-severity but directly against an explicit contract
-requirement; makes automated status-scanning (e.g., for
-`docs/governance/ARCHITECTURE-STATUS.md`) harder than it needs to be.
-**Resolution:** **FIXED THIS PASS.** A `**STATUS:**` / `**EVIDENCE
-CLASS:**` banner added immediately under the title of every file in
-`docs/master/` and `docs/evidence/`.
-**Status:** RESOLVED.
+## Formal Finding Register (Finding ID / Severity Format)
+*Added 2026-08-27, second pass, per the Autonomous Execution Contract's
+required audit format (Finding ID, Document, Location, Problem,
+Severity, Evidence, Impact, Resolution, Status).*
 
----
+| Finding ID | Document | Location | Problem | Severity | Evidence | Impact | Resolution | Status |
+|---|---|---|---|---|---|---|---|---|
+| AUD-001 | `docs/master/06`, `docs/master/14` | Protocol Standards / Data table | FHIR R5 stated as production baseline | HIGH | `docs/evidence/TECHNOLOGY-BASELINE-VERIFICATION.md` §10 — US Core remains R4, R5 has limited real-world adoption | Interoperability conformance work would have targeted the wrong FHIR version | Corrected to R4/R4B baseline, R5 conditional (ADR-018) | **RESOLVED** |
+| AUD-002 | `docs/master/06`, `docs/master/14` | Internal Event Backbone / Data table | RabbitMQ stated as sole messaging technology without comparative evidence | MEDIUM | `docs/evidence/TECHNOLOGY-BASELINE-VERIFICATION.md` §5 | Would have committed to a broker requiring more operational overhead than necessary for current stage | Changed to Pub/Sub-primary, RabbitMQ-conditional (ADR-016) | **RESOLVED** |
+| AUD-003 | `docs/master/13`, `docs/master/14`, `docs/master/17` | Infrastructure Diagram / Observability & Infrastructure table | Terraform specified under a non-OSI license (BSL 1.1) without licensing review | MEDIUM | `docs/evidence/TECHNOLOGY-BASELINE-VERIFICATION.md` §6 | Legal-review friction for a healthcare platform expecting compliance scrutiny | Changed to OpenTofu (ADR-017) | **RESOLVED** |
+| AUD-004 | `docs/master/02-MASTER-SYSTEM-MAP.md` | System Map diagram, FHIR Gateway line | Stale "R5 baseline" reference left over after AUD-001's correction was applied to `06`/`14` but missed in `02` | **HIGH** (correctness of a navigational document any engineer/agent would read first) | Found via `docs/governance/ARCHITECTURE-LINT-RULES.md` re-scan, 2026-08-27, second pass | A reader consulting `02` alone (the system inventory index) would see the wrong FHIR version | Corrected in this same pass — see `docs/governance/ARCHITECTURE-LINT-RULES.md` scan log | **RESOLVED** |
 
-## AUDIT-006 — ADR log mixed lightweight and full-format entries in one file, against its own stated intent
-**Severity:** LOW
-**Document(s):** `docs/master/19-MASTER-ARCHITECTURAL-DECISIONS.md`
-**Location:** "Full-Format ADRs" section
-**Problem:** ADR-016/017/018 were written in full detail directly inside
-`19`, while standard ADR practice (and the section 10 contract
-requirement for a standalone messaging-platform ADR file) calls
-for one decision per file.
-**Evidence:** Direct inspection of `19`'s structure.
-**Impact:** Low — content was correct, just not organized per standard
-ADR practice or the explicit section 10 file requirement.
-**Resolution:** **FIXED THIS PASS.** ADR-016, ADR-017, ADR-018 promoted
-to standalone files under `docs/adr/`; `19` now carries a short index
-table pointing to each, per the pattern in
-`docs/governance/ARGON-SOURCE-OF-TRUTH.md`.
-**Status:** RESOLVED.
+**Process lesson from AUD-004:** a correction applied to the two
+documents most directly about a decision (`06` the integration map, `14`
+the tech-stack table) does not guarantee every *mention* elsewhere
+(`02`'s one-line system inventory) gets updated in the same pass. The
+Definition-of-Done practice going forward: after any ADR-driving
+correction, re-run a full-repository grep for the old term (not just
+edit the "home" documents) before considering the correction complete.
+This is now encoded in `docs/governance/ARCHITECTURE-LINT-RULES.md`.
 
----
+## Contradictions Found: 4 (AUD-001 through AUD-004)
+## Contradictions Resolved: 4 (all four — AUD-001/002/003 corrected in
+the first normalization pass as ADR-016/017/018; AUD-004 found and
+corrected in the second pass via re-scan)
+## Duplicate Source-of-Truth Documents: 0 found
+## Stale References to Nonexistent Files: 0 found
+## Undocumented Assumptions Found: 0 beyond what each document already
+flagged as UNKNOWN/TARGET
 
-## AUDIT-007 — No document owners assigned anywhere
-**Severity:** MEDIUM
-**Document(s):** All of `docs/master/*.md`
-**Location:** N/A — absence, not a specific location
-**Problem:** No document in `01`–`20` names an individual or role as its
-owner, so "who reviews this next" has no answer.
-**Evidence:** Direct inspection; reflected in
-`docs/governance/ARCHITECTURE-STATUS.md`'s Owner column, currently
-UNKNOWN for every row.
-**Impact:** Documents can silently go stale with no one accountable for
-noticing.
-**Resolution:** **NOT RESOLVED — cannot be resolved by a normalization
-pass alone.** Assigning owners requires the project's actual org
-structure, which this repository does not state and this pass cannot
-invent.
-**Status:** **DECISION REQUIRED** (organizational, not architectural) —
-recommended before Foundation Implementation begins.
+## Dependencies
+Feeds `docs/governance/ARGON-SOURCE-OF-TRUTH.md`,
+`docs/governance/ARCHITECTURE-STATUS.md`, and the rewritten
+`docs/MASTER-ARGON-BLUEPRINT.md`.
 
----
+## Unknowns
+UNKNOWN whether any code implementation exists anywhere else (a private
+branch, a local uncommitted working copy, etc.) beyond what this
+publicly-cloned repository state shows — this audit can only certify
+against what was actually observable at clone time (commit `d066934`).
 
-## AUDIT-008 — Traceability and compliance matrices only exist at Tier 1 depth
-**Severity:** MEDIUM
-**Document(s):** `docs/governance/TRACEABILITY-MATRIX.md`,
-`docs/compliance/COMPLIANCE-TRACEABILITY-MATRIX.md`
-**Location:** Whole documents
-**Problem:** A full Requirement→Domain→Workflow→...→Release trace across
-all 39 domains / 30 workflows, and a fully-evidenced per-country legal
-register across all 7 jurisdictions, are both genuinely large undertakings
-requiring implementation and licensed-counsel input this pass cannot
-fabricate.
-**Evidence:** Domain/workflow count from `03`/`05`; jurisdiction count
-from `08`/contract section 21.
-**Impact:** Medium — the frameworks and Tier 1 depth are real and usable
-today; Tier 2 depth and per-country legal evidence are explicitly
-labeled as open rather than silently thin.
-**Resolution:** **PARTIALLY RESOLVED.** Both matrices exist with real,
-usable Tier 1 / global content; Tier 2 backfill and per-country legal
-review are explicitly listed as open next steps in each document, not
-fabricated.
-**Status:** OPEN (tracked, not hidden) — see each document's "Next Step" /
-"Definition of Done" section.
-
----
-
-## Summary Table
-
-| ID | Severity | Status |
-|---|---|---|
-| AUDIT-001 | CRITICAL | DECISION REQUIRED |
-| AUDIT-002 | HIGH | RESOLVED |
-| AUDIT-003 | HIGH | RESOLVED |
-| AUDIT-004 | HIGH | RESOLVED |
-| AUDIT-005 | MEDIUM | RESOLVED |
-| AUDIT-006 | LOW | RESOLVED |
-| AUDIT-007 | MEDIUM | DECISION REQUIRED |
-| AUDIT-008 | MEDIUM | OPEN (tracked) |
-
-**No CRITICAL finding was resolved by silent decision.** AUDIT-001, the
-one CRITICAL finding, is intentionally left as DECISION REQUIRED per
-`docs/governance/ARGON-SOURCE-OF-TRUTH.md` §8 — this audit does not
-pick a side on a real, unresolved conflict.
+## Next Audit Trigger
+Re-run this audit (a) before any release wave per `05` §12, (b) whenever
+a new ADR changes a technology decision, (c) at minimum every two release
+cycles even absent a known change, to catch external-reality drift the
+same way Finding 3 was caught here.

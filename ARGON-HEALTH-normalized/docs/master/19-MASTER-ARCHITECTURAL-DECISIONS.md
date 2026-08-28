@@ -1,7 +1,7 @@
 # 19 — MASTER ARCHITECTURAL DECISIONS
 
-**STATUS:** TARGET ARCHITECTURE / PROPOSED
-**EVIDENCE CLASS:** DESIGN
+STATUS: PROPOSED
+EVIDENCE CLASS: DESIGN
 
 ## Status
 TARGET ARCHITECTURE / PROPOSED. This document is an index of decisions
@@ -145,20 +145,129 @@ description of "provision a hospital in minutes" must carry this caveat.
 ---
 
 ### Full-Format ADRs (2026-08-27 Architecture Normalization Pass)
-*These follow the fuller ADR template (ADR ID, Title, Status, Date,
-Context, Problem, Options, Evidence, Decision, Rationale, Consequences,
-Security/Operational/Compliance Impact, Revisit Trigger, Rollback/Exit
-Strategy). ADR-001–ADR-015 above remain in the lightweight format pending
-a full reformat pass — tracked as open work, not silently upgraded. As of
-the repository normalization pass, each full-format ADR's complete text
-lives in its own file under `docs/adr/`, one decision per file, per
-standard ADR practice; the index below is the summary, not a duplicate.*
+*The three entries below follow the fuller ADR template required by the
+Architecture Normalization task (ADR ID, Title, Status, Date, Context,
+Problem, Options, Evidence, Decision, Rationale, Consequences, Security/
+Operational/Compliance Impact, Revisit Trigger, Rollback/Exit Strategy).
+ADR-001–ADR-015 above remain in the lightweight format pending a full
+reformat pass — tracked as open work, not silently upgraded.*
 
-| ADR | Title | Status | Full text |
-|---|---|---|---|
-| ADR-016 | Internal event backbone: Google Cloud Pub/Sub (primary), RabbitMQ (conditional), Kafka (rejected) | PROPOSED | `docs/adr/ADR-016-MESSAGING-PLATFORM.md` |
-| ADR-017 | Infrastructure as Code: OpenTofu (replacing Terraform) | PROPOSED | `docs/adr/ADR-017-INFRASTRUCTURE-AS-CODE.md` |
-| ADR-018 | FHIR production baseline corrected to R4/R4B (was R5) | PROPOSED (correction) | `docs/adr/ADR-018-FHIR-PRODUCTION-BASELINE.md` |
+**ADR-016 — Internal event backbone: Google Cloud Pub/Sub (primary),
+RabbitMQ (conditional), Kafka (rejected)**
+- Status: **PROPOSED** (not Approved — requires sign-off per ADR-009's
+  discipline applied to itself)
+- Date: 2026-08-27
+- Context: `06`'s original target named RabbitMQ as the sole internal
+  event backbone. The Architecture Normalization task required a fresh,
+  non-popularity-based comparison against Google Cloud Pub/Sub and Apache
+  Kafka.
+- Problem: Which messaging technology should back the Transactional
+  Outbox pattern for a single-team-operated, GCP-native platform at its
+  current stage?
+- Options: RabbitMQ (self/managed), Google Cloud Pub/Sub (managed),
+  Apache Kafka (self-managed or Confluent).
+- Evidence: `docs/evidence/TECHNOLOGY-BASELINE-VERIFICATION.md` §5 (live
+  research, 2026-08-27).
+- Decision: Pub/Sub primary; RabbitMQ conditional (AMQP-only external
+  adapters only); Kafka rejected for the current stage.
+- Rationale: Pub/Sub eliminates broker/partition operational burden
+  entirely on a platform that is already GCP-first end to end (`13`);
+  no evidenced requirement justifies Kafka's added operational
+  complexity; RabbitMQ remains available where a specific external
+  system requires AMQP.
+- Consequences: `06`'s Internal Event Backbone section and `14`'s Data
+  table are both updated; the domain layer depends on a messaging
+  abstraction, not a broker SDK, keeping this reversible.
+- Security Impact: Pub/Sub inherits GCP IAM scoping natively; no new
+  broker-credential surface to manage versus a self-hosted RabbitMQ.
+- Operational Impact: Removes cluster/broker management from the
+  platform-ops workload entirely for the primary path.
+- Compliance Impact: None identified; data-residency implications of
+  Pub/Sub (regional topic placement) should be checked per country
+  during Phase 6 (`20`) alongside the Government Country Adapter work.
+- Revisit Trigger: A measured requirement for cross-partition ordering
+  at platform scale, or a real long-window event-replay/event-sourcing
+  need beyond Pub/Sub's 31-day maximum retention.
+- Rollback/Exit Strategy: Because domain code depends on the messaging
+  abstraction rather than the Pub/Sub SDK, swapping the underlying
+  transport (including back to RabbitMQ or to Kafka) is an
+  infrastructure-and-adapter change, not a domain-code rewrite.
+
+**ADR-017 — Infrastructure as Code: OpenTofu (replacing Terraform)**
+- Status: **PROPOSED**
+- Date: 2026-08-27
+- Context: `13`/`14`'s original target named Terraform. The Architecture
+  Normalization task explicitly listed "Terraform vs OpenTofu" as a
+  drift category to verify with fresh evidence.
+- Problem: Which IaC tool should the platform standardize on, given
+  Terraform's 2023 relicensing to BSL 1.1 and IBM's 2024 acquisition of
+  HashiCorp?
+- Options: Terraform (BSL 1.1, IBM-owned), OpenTofu (MPL 2.0, Linux
+  Foundation-governed fork).
+- Evidence: `docs/evidence/TECHNOLOGY-BASELINE-VERIFICATION.md` §6 (live
+  research, 2026-08-27).
+- Decision: OpenTofu adopted as the IaC baseline.
+- Rationale: OSI-approved MPL 2.0 licensing reduces legal-review friction
+  for a healthcare platform expecting ongoing compliance/legal review
+  (`08`); native state/plan encryption is a concrete security
+  improvement over Terraform's open CLI; HCL syntax and provider
+  ecosystem are near-identical, keeping migration risk low; no
+  Terraform-exclusive feature (e.g., HCP Terraform Stacks) is required
+  by anything in this architecture today.
+- Consequences: `13`'s Infrastructure Diagram section and `14`'s
+  Observability & Infrastructure table both updated; Terraform state
+  language throughout `13`/`17` updated to OpenTofu state.
+- Security Impact: Native state encryption directly strengthens the
+  Terraform-state DR/security posture already tracked in `17`.
+- Operational Impact: Near-zero — CLI and workflow are effectively a
+  binary swap (`terraform` → `tofu`).
+- Compliance Impact: Improves license-review posture for regulated
+  jurisdictions (`08`).
+- Revisit Trigger: A specific need for an HCP-Terraform-exclusive
+  capability, or evidence of GCP-provider compatibility regression in
+  OpenTofu.
+- Rollback/Exit Strategy: Both tools read the same state format as of
+  this writing; a "dual-engine" fallback (Terraform CLI against the same
+  state) remains available without a state migration if ever needed.
+
+**ADR-018 — FHIR production baseline corrected to R4/R4B (was R5)**
+- Status: **PROPOSED** (correction, not yet independently reviewed)
+- Date: 2026-08-27
+- Context: The original `06`/`14` target stated FHIR R5 as the
+  production baseline with R4/R4B as a compatibility layer. The
+  Architecture Normalization task required re-verifying this against
+  current official/authoritative sources rather than carrying it forward
+  unverified.
+- Problem: Is R5 actually the correct production target for near-term
+  real-world interoperability (government systems, payers, external
+  labs)?
+- Options: R4/R4B as baseline (R5 optional), R5 as baseline (R4/R4B
+  compatibility), R6 as baseline (rejected outright — still in ballot).
+- Evidence: `docs/evidence/TECHNOLOGY-BASELINE-VERIFICATION.md` §10 (live
+  research, 2026-08-27): US Core (the dominant regulatory FHIR baseline)
+  remains on R4 and is not planning to move to R5; R5 is independently
+  described as having limited real-world adoption; R6 is still in ballot
+  (first full ballot dated May 2026), with production-grade adoption not
+  expected before late 2027 per HL7's own guidance.
+- Decision: FHIR R4/R4B is now the stated production target; R5 is
+  transitional/optional (adopted only per specific partner requirement);
+  R6 is tracked, not adopted.
+- Rationale: Matches the regulatory and ecosystem reality found in fresh
+  research rather than an earlier, unverified assumption that R5 was the
+  more "current" and therefore preferable choice.
+- Consequences: This is a **documentation correction**, not a scope
+  change — no domain/workflow document required rewriting beyond the
+  `06`/`14` version labels, since the canonical internal clinical model
+  (`Clinical` domain, `03`) was never FHIR-native in the first place.
+- Security Impact: None identified.
+- Operational Impact: None identified at this design stage.
+- Compliance Impact: Directly improves alignment with the dominant
+  regulatory FHIR baseline (US Core / ONC Cures Act / CMS), reducing
+  future integration-conformance risk.
+- Revisit Trigger: FHIR R6 reaching final/normative publication.
+- Rollback/Exit Strategy: N/A — this is itself the correction of an
+  earlier, unverified claim; there is no prior "implementation" to roll
+  back.
 
 ## Alternatives Considered
 Each ADR above already documents its own alternative(s) inline — this
