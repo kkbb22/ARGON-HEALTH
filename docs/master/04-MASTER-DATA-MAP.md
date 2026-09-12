@@ -39,7 +39,8 @@ UNKNOWN — REQUIRES EVIDENCE (see `01`).
 | Laboratory | PostgreSQL | Pending-result queue | Instrument raw output archive (optional) | Turnaround-time metrics |
 | Radiology | PostgreSQL (report/metadata only) | Worklist cache | **DICOM instances — object storage only, never PostgreSQL** | Report-turnaround metrics |
 | Hospital Ops | PostgreSQL | Bed-state lock/cache | — | Occupancy, LOS metrics |
-| Billing, Payments | PostgreSQL (NUMERIC, never float) | Invoice-render cache | Generated PDF invoices | Revenue, aging metrics |
+| Billing | PostgreSQL (NUMERIC, never float) — owns `Payment` as the ledger/accounting posting record only; this is Billing's source of truth for the posted amount, date, and reconciliation status | Invoice-render cache | Generated PDF invoices | Revenue, aging metrics |
+| Payments | PostgreSQL (NUMERIC, never float) — owns `PaymentTransaction`/`RefundTransaction` as the gateway-facing transaction source of truth. `PaymentTransaction` ≠ Billing's `Payment` (see ACR-5, `03`) — Payments never becomes a ledger, Billing never becomes gateway-facing; the two rows are deliberately kept separate here for that reason | — | — | Transaction volume / failure-rate metrics |
 | Insurance, Claims | PostgreSQL | Eligibility-check cache | Payer response archives | Denial-rate metrics |
 | Documents | Metadata in PostgreSQL | — | Binary content — object storage | Storage-volume metrics |
 | Notifications, Communications | PostgreSQL (delivery log) | Send-queue | — | Delivery-rate metrics |

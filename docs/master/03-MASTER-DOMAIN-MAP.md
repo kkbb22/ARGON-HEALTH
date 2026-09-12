@@ -126,19 +126,24 @@ Definition of Done
 ## PATIENT
 - **Purpose:** Own one unified, longitudinal patient identity and view
   across every clinical and financial domain.
-- **Responsibilities:** Demographics, identity resolution (MPI), consent
-  state, and the assembled Patient 360 timeline.
-- **Entities:** Patient, Identifier, Demographics, ContactInfo, ConsentRecord.
-- **Commands:** RegisterPatient, UpdateDemographics, RecordConsent, MergeDuplicate.
-- **Queries:** GetPatient360, ResolveIdentity, GetConsentStatus.
-- **Events:** PatientRegistered, DemographicsUpdated, ConsentChanged, DuplicatesMerged.
+- **Responsibilities:** Demographics, identity resolution (MPI), and the
+  assembled Patient 360 timeline. Consent state is owned by the
+  **Consent** domain (`03`, below) — Patient reads it via delegation and
+  never issues its own consent-write commands (see ACR-1 resolution).
+- **Entities:** Patient, Identifier, Demographics, ContactInfo.
+- **Commands:** RegisterPatient, UpdateDemographics, MergeDuplicate.
+- **Queries:** GetPatient360, ResolveIdentity, GetConsentStatus
+  (read-through delegation to the Consent domain — Patient does not
+  store or write consent state itself).
+- **Events:** PatientRegistered, DemographicsUpdated, DuplicatesMerged.
 - **APIs:** Internal Patient Service API consumed by Clinical, Pharmacy,
   Lab, Radiology, Hospital, Billing — none of which store a second copy of
   patient identity.
 - **Permissions:** Registration staff for demographics; patient (via app)
-  for consent and self-service updates; clinical roles for read access
-  scoped to active care relationship.
-- **Dependencies:** Platform, Identity, Organization.
+  for self-service updates; clinical roles for read access scoped to
+  active care relationship.
+- **Dependencies:** Platform, Identity, Organization, Consent (for
+  consent status).
 - **External Integrations:** National ID / civil registry lookups where
   available per country adapter (`17`).
 - **Data Classification:** PHI — highest sensitivity.
@@ -149,10 +154,12 @@ Definition of Done
   records, never silently drop one.
 - **Tests:** DENY read access without an active care relationship or
   documented purpose-of-use; ALLOW patient self-read of own record.
-- **Compliance Requirements:** Consent state gates data sharing with every
-  downstream domain and external integration.
+- **Compliance Requirements:** Consent state (owned by the Consent
+  domain) gates data sharing with every downstream domain and external
+  integration.
 - **Definition of Done:** No domain (Pharmacy, Lab, Radiology, Hospital,
-  Billing) maintains an independent patient identity table.
+  Billing) maintains an independent patient identity table. No domain
+  other than Consent maintains an independent consent-write surface.
 
 ## CLINICAL
 - **Purpose:** Own the clinical record — encounters, notes, diagnoses,
@@ -172,7 +179,12 @@ Definition of Done
 - **Permissions:** Attending/treating clinician for write within active
   encounter; read scoped to documented care relationship; amendments
   require reason + original-preserving versioning.
-- **Dependencies:** Platform, Identity, Organization, Patient, Specialties.
+- **Dependencies:** Platform, Identity, Organization, Patient, Specialties
+  (read-time query composition — Clinical consults Specialties'
+  `SpecialtyTemplate` via a query at documentation time; this is
+  explicit read-time composition, not an event, and not a synchronous
+  side-effecting call — the dependency itself is not being removed or
+  redesigned, see ACR-3).
 - **External Integrations:** None directly — Pharmacy/Lab/Radiology
   integrate via Order/Result events, not direct table access.
 - **Data Classification:** PHI — highest sensitivity, clinical-legal record.
@@ -325,25 +337,44 @@ Definition of Done
 - **Purpose:** Own charge capture through invoicing and payment
   reconciliation as an immutable financial ledger.
 - **Responsibilities:** Price lists/contracts, charge capture from clinical
-  events, invoicing, payments, refunds, statements, aging.
-- **Entities:** ChargeItem, Invoice, Payment, CreditNote, PatientAccount
+  events, invoicing, refunds, statements, aging. Payment **transaction
+  processing** (gateway interaction, idempotency, tokenization) is owned
+  exclusively by the **Payments** domain (`03`, below — ACR-5
+  resolution); Billing owns only the ledger/accounting posting of a
+  payment outcome, never the transaction itself.
+- **Entities:** ChargeItem, Invoice, **Payment** (a ledger/accounting
+  posting record only — amount, date, reconciliation status; this is
+  *not* the same object as Payments' `PaymentTransaction` and never
+  carries gateway/card/tokenization detail), CreditNote, PatientAccount
   — every monetary entity carries an explicit **currency** field
   (closes the Billing half of GAP-011), defaulting to JOD for the home
   jurisdiction and set per-transaction for any other country adapter
   (`06`); no entity assumes a single implicit platform-wide currency.
-- **Commands:** CaptureCharge, GenerateInvoice, RecordPayment, IssueCreditNote.
+- **Commands:** CaptureCharge, GenerateInvoice, RecordPayment (an
+  internal ledger-posting reaction to Payments' `PaymentCaptured` event
+  — Billing never initiates or drives a gateway transaction itself),
+  IssueCreditNote.
 - **Queries:** GetPatientBalance, GetInvoiceHistory, GetAgingReport.
-- **Events:** ChargeCaptured, InvoiceIssued, PaymentReceived,
-  CreditNoteIssued, AccountReconciled.
+- **Events:** ChargeCaptured, InvoiceIssued, PaymentReceived (fired by
+  Billing once it has posted a Payments-domain `PaymentCaptured`
+  outcome to the ledger — this is a ledger-posted signal, not a
+  gateway-received signal), CreditNoteIssued, AccountReconciled.
 - **APIs:** Internal Billing Service API; e-invoicing government adapter
   via Interoperability Layer (`17`).
 - **Permissions:** Billing staff for charge/invoice operations; finance
   role for credit notes and corrections; no direct edit of a posted
   financial record.
 - **Dependencies:** Platform, Identity, Organization, Patient, Clinical
-  (charge triggers), Insurance.
-- **External Integrations:** Government e-invoicing (country adapter),
-  payment gateways.
+  (charge triggers), Insurance (event/command-mediated — Billing routes
+  the insurance portion of a charge and reacts to Insurance's
+  adjudication/remittance events; this declared dependency does not
+  imply a synchronous, side-effecting runtime call, and the dependency
+  itself is not being removed or redesigned, see ACR-3), Payments (for
+  payment-transaction outcomes, see ACR-5).
+- **External Integrations:** Government e-invoicing (country adapter)
+  only. Billing is explicitly **not** gateway-facing — all payment
+  gateway interaction is owned by the Payments domain (ACR-5); Billing
+  never becomes a second source of truth for a payment transaction.
 - **Data Classification:** Financial PII, regulated by tax/e-invoicing law
   per country.
 - **Audit Requirements:** Every posted financial record change is via a
@@ -354,46 +385,57 @@ Definition of Done
   `01`, `14`).
 - **Tests:** DENY in-place edit of a posted invoice; ALLOW correction only
   via credit note + new charge; DENY monetary rounding drift under
-  repeated operations.
+  repeated operations; DENY any Billing code path that calls a payment
+  gateway directly (ACR-5 — must route through Payments' `CapturePayment`).
 - **Compliance Requirements:** Country-specific e-invoicing format
   validation (`17-MASTER...` government section).
 - **Definition of Done:** Every posted charge is traceable to the clinical
-  or operational event that generated it.
+  or operational event that generated it. Every Billing `Payment` ledger
+  record traces to the Payments-domain `PaymentTransaction` that funded
+  it.
 
 ## INSURANCE
 - **Purpose:** Own payer relationships without hardcoding any insurer into
   Clinical or Billing.
 - **Responsibilities:** Eligibility/coverage/benefits checks,
-  authorization, claim submission and lifecycle, remittance
-  reconciliation.
-- **Entities:** Payer, Coverage, Authorization, Claim, Remittance,
+  authorization, adjudication and remittance reconciliation. Claim
+  submission itself is owned by the **Claims** domain (`03`, below —
+  ACR-2 resolution); Insurance consumes Claims' `ClaimSubmitted` to
+  track adjudication.
+- **Entities:** Payer, Coverage, Authorization, Remittance,
   **CoverageTerms** (co-pay: fixed patient fee per service; deductible:
   accumulating annual threshold before Coverage pays — closes the
   Insurance half of GAP-011 in `docs/audit/FINAL-GAP-ANALYSIS.md` by
   naming these as distinct entities rather than folding them into a
   generic "Patient Responsibility" bucket, since they're structurally
-  different calculations).
-- **Commands:** CheckEligibility, RequestAuthorization, SubmitClaim,
+  different calculations). Claim is owned by the Claims domain, not
+  Insurance.
+- **Commands:** CheckEligibility, RequestAuthorization,
   ReconcileRemittance, FileAppeal.
 - **Queries:** GetCoverageStatus, GetClaimStatus, GetDenialReasons.
 - **Events:** EligibilityChecked, AuthorizationGranted/Denied,
-  ClaimSubmitted, ClaimAdjudicated, RemittancePosted.
+  ClaimAdjudicated, RemittancePosted.
 - **APIs:** Internal Insurance Service API; Payer Adapter Framework
   (per-payer plugins) via Interoperability Layer.
 - **Permissions:** Registration/billing staff for eligibility checks;
-  billing staff for claim submission; finance for remittance
-  reconciliation.
-- **Dependencies:** Platform, Identity, Organization, Patient, Billing.
+  finance for remittance reconciliation.
+- **Dependencies:** Platform, Identity, Organization, Patient, Billing
+  (event/command-mediated — Insurance reacts to Billing's charge-routing
+  events and Billing reacts to Insurance's adjudication/remittance
+  events; this declared dependency does not imply a synchronous,
+  side-effecting runtime call, and the dependency itself is not being
+  removed or redesigned, see ACR-3), Claims (for submitted-claim status).
 - **External Integrations:** Individual payer gateways behind the Payer
   Adapter Framework — no payer-specific logic in Clinical Core.
 - **Data Classification:** PHI + financial data (coverage details linked
   to patient).
-- **Audit Requirements:** Every eligibility/authorization/claim action
-  audited with payer response captured verbatim for dispute resolution.
+- **Audit Requirements:** Every eligibility/authorization/adjudication
+  action audited with payer response captured verbatim for dispute
+  resolution.
 - **Failure Modes:** Payer gateway outage must queue submissions for
   retry, never silently drop a claim.
-- **Tests:** DENY claim submission without a prior eligibility check on
-  file; ALLOW resubmission after denial with amended data.
+- **Tests:** DENY authorization request without a prior eligibility check
+  on file.
 - **Compliance Requirements:** Payer-specific data handling per contract;
   see `17` for national payer/government scheme adapters.
 - **Definition of Done:** Adding a new payer requires only a new adapter
@@ -490,19 +532,22 @@ with reason. Compliance: identity-resolution errors treated as clinical
 safety incidents (`16`). DoD: zero silent auto-merges in production.
 
 ## CONSENT
-Purpose: track what a patient has agreed to share and with whom.
-Responsibilities: consent capture, versioning, withdrawal, scope
-enforcement. Entities: ConsentRecord, ConsentScope, WithdrawalRecord.
-Commands: CaptureConsent, WithdrawConsent. Queries: GetActiveConsentScopes.
-Events: ConsentGranted, ConsentWithdrawn. APIs: internal, checked by every
-domain and by Interoperability Layer before any external share. Permissions:
-patient (self), guardian (documented relationship). Dependencies: Patient,
-Identity. External Integrations: none directly. Data Classification: PHI.
-Audit: every consent check and every override logged. Failure Modes:
-missing consent record must default to most restrictive sharing, not
-permissive. Tests: DENY external share without matching active consent
-scope. Compliance: core to `08` data-subject-rights controls. DoD: every
-external data share can point to the consent record that authorized it.
+Purpose: track what a patient has agreed to share and with whom. This
+is the **sole owner** of consent write operations (ACR-1 resolution) —
+Patient (`03`, above) reads consent status via delegation but never
+writes it. Responsibilities: consent capture, versioning, withdrawal,
+scope enforcement. Entities: ConsentRecord, ConsentScope,
+WithdrawalRecord. Commands: CaptureConsent, WithdrawConsent. Queries:
+GetActiveConsentScopes. Events: ConsentGranted, ConsentWithdrawn. APIs:
+internal, checked by every domain and by Interoperability Layer before
+any external share. Permissions: patient (self), guardian (documented
+relationship). Dependencies: Patient, Identity. External Integrations:
+none directly. Data Classification: PHI. Audit: every consent check and
+every override logged. Failure Modes: missing consent record must
+default to most restrictive sharing, not permissive. Tests: DENY
+external share without matching active consent scope. Compliance: core
+to `08` data-subject-rights controls. DoD: every external data share
+can point to the consent record that authorized it.
 
 ## SPECIALTIES
 Purpose: extend Clinical Core per medical specialty without forking it.
@@ -511,7 +556,11 @@ layered on Clinical Core entities. Entities: SpecialtyProfile,
 SpecialtyTemplate. Commands: RegisterSpecialtyExtension. Queries:
 GetSpecialtyTemplate. Events: SpecialtyExtensionRegistered. APIs: plugin
 interface consumed by Clinical. Permissions: clinical configuration admin.
-Dependencies: Clinical. External Integrations: none. Data Classification:
+Dependencies: Clinical (structural/design-time — Specialties extends
+Clinical's model; this declared dependency does not imply a synchronous,
+side-effecting runtime call back into Clinical, and the dependency
+itself is not being removed or redesigned, see ACR-3). External
+Integrations: none. Data Classification:
 inherits Clinical (PHI). Audit: extension registration audited. Failure
 Modes: a specialty extension must never bypass Clinical Core's
 amendment/versioning rules. Tests: DENY specialty extension that writes
@@ -633,9 +682,14 @@ DENY PO auto-close on quantity mismatch. Compliance: n/a beyond financial
 controls. DoD: every received item traces to an open PO line.
 
 ## PAYMENTS
-Purpose: process patient and payer payments. Responsibilities: payment
+Purpose: process patient and payer payments. This is the **sole
+gateway-facing domain** for payment transactions (ACR-5 resolution) —
+Billing (`03`, above) never calls a gateway directly and never stores
+transaction-level detail; Payments owns the transaction, Billing owns
+only the resulting ledger entry. Responsibilities: payment
 capture, refunds, gateway integration. Entities: PaymentTransaction,
-RefundTransaction. Commands: CapturePayment, IssueRefund. Queries:
+RefundTransaction (distinct from Billing's `Payment` ledger record —
+PaymentTransaction ≠ Payment). Commands: CapturePayment, IssueRefund. Queries:
 GetPaymentHistory. Events: PaymentCaptured, RefundIssued,
 PaymentFailed. APIs: internal + payment gateway adapter. Permissions:
 billing staff, patient (self-service payment). Dependencies: Billing.
@@ -658,7 +712,10 @@ billing/coding staff. Dependencies: Insurance, Billing, Clinical (coding
 source). External Integrations: payer adapters. Data Classification: PHI +
 financial. Audit: full claim lifecycle logged. Failure Modes: coding
 mismatch between clinical record and claim must block submission, not
-just warn. Tests: DENY submission with unresolved coding discrepancy.
+just warn. Tests: DENY submission with unresolved coding discrepancy; DENY
+submission without a prior eligibility check on file (moved from
+Insurance under the ACR-2 resolution — Claims now owns the submission
+precondition, not just the coding precondition).
 Compliance: coding accuracy required by payer contracts. DoD: every claim
 line traces to a specific clinical charge item.
 

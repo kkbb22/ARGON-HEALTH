@@ -20,6 +20,11 @@ depth. **Tier 2** (15 workflows) gets complete-but-compact profiles,
 several cross-referencing the master document that owns their full detail
 (Organization Provisioning → `11`; Integration mechanics → `06`; Disaster
 Recovery → `17`) to avoid duplicating content across documents.
+**Procurement is deliberately not one of the 30** — it is fully specified
+and wired at the domain level in `03` (its `CreatePO` command is
+triggered by Inventory's `ThresholdBreached` event; `ReceiveGoods` closes
+the loop via Inventory's `ReceiveStock`), which was judged sufficient
+without adding a 31st workflow slot here (ACR-4 resolution).
 
 ## Current Assumptions
 Every workflow below composes commands/events already defined per-domain
@@ -38,11 +43,16 @@ UNKNOWN — REQUIRES EVIDENCE (see `01`).
 - **Actor:** Registration staff, or patient (self-service).
 - **Preconditions:** Facility active; registration module entitled.
 - **Steps:** Capture demographics → MPI identity resolution (check for
-  existing record) → capture consent → assign facility-scoped identifier →
-  link/merge if candidate match found → create Patient 360 record.
-- **Data:** Demographics, ContactInfo, ConsentRecord (Patient domain, `03`).
-- **Events:** PatientRegistered, ConsentChanged, (optionally)
-  DuplicatesMerged.
+  existing record) → capture consent (via Consent domain's
+  `CaptureConsent`, ACR-1, 2026-09-08 — not a Patient-owned step) →
+  assign facility-scoped identifier → link/merge if candidate match
+  found → create Patient 360 record.
+- **Data:** Demographics, ContactInfo (Patient domain, `03`);
+  ConsentRecord (Consent domain, `03` — Patient no longer owns this
+  entity, see ACR-1).
+- **Events:** PatientRegistered (Patient), ConsentGranted (Consent —
+  not `ConsentChanged`, which no longer exists as a Patient-domain
+  event), (optionally) DuplicatesMerged.
 - **Permissions:** Registration staff (facility-scoped); patient self-write
   restricted to own record after identity verification.
 - **External Integrations:** Optional national ID lookup (`Government
@@ -266,22 +276,36 @@ UNKNOWN — REQUIRES EVIDENCE (see `01`).
 - **Steps:** Charge captured (event-driven) → priced against
   contract/price list → discounts/taxes applied → invoice generated →
   insurance portion routed to Insurance workflow → patient portion
-  collected → payment reconciled → statement issued if balance remains.
-- **Data:** ChargeItem, Invoice, Payment, PatientAccount (Billing domain).
-- **Events:** ChargeCaptured, InvoiceIssued, PaymentReceived,
-  AccountReconciled.
+  routed to the Payments domain's `CapturePayment` command → Payments
+  handles the gateway transaction (idempotency, tokenization) → on
+  `PaymentCaptured`, Billing posts the ledger entry (`RecordPayment`) →
+  statement issued if balance remains.
+- **Data:** ChargeItem, Invoice, PatientAccount (Billing domain, ledger
+  side). Billing's `Payment` entity is the ledger-posting record only.
+  `PaymentTransaction`/`RefundTransaction` (the actual gateway
+  transaction) belong exclusively to the **Payments** domain (`03`) —
+  Billing never writes or reads transaction-level detail directly
+  (ACR-5).
+- **Events:** ChargeCaptured, InvoiceIssued, PaymentReceived (Billing's
+  own ledger-posted signal — fired after consuming Payments'
+  `PaymentCaptured`), AccountReconciled. Consumes
+  PaymentCaptured/PaymentFailed/RefundIssued (Payments).
 - **Permissions:** Billing staff for invoice/charge operations; finance
   role for corrections (credit note only, never in-place edit).
-- **External Integrations:** Payment gateway; government e-invoicing
-  adapter (see `06`).
+- **External Integrations:** Government e-invoicing adapter (see `06`)
+  only. The payment gateway itself is integrated exclusively by the
+  Payments domain — Billing is never gateway-facing (ACR-5).
 - **Success State:** Invoice fully reconciled (paid + insurance-settled +
   any adjustment).
-- **Failure State:** Payment gateway timeout — must not double-charge;
-  idempotency key required.
-- **Retry:** Gateway retries via idempotency key; e-invoicing submission
-  retried with backoff, escalated to manual review after exhaustion.
-- **Audit:** Every charge, invoice, payment, and credit note logged;
-  posted records corrected only via reversing entries.
+- **Failure State:** Payment gateway timeout — Payments' idempotency-key
+  handling (`03`) prevents double-charge; Billing treats a
+  `PaymentFailed` event as unresolved balance, not a system error.
+- **Retry:** Gateway retries owned by Payments via idempotency key;
+  e-invoicing submission retried with backoff, escalated to manual
+  review after exhaustion.
+- **Audit:** Every charge, invoice, and credit note logged by Billing;
+  every payment/refund transaction logged by Payments (`03`); posted
+  records corrected only via reversing entries.
 - **Notifications:** Invoice/receipt delivery, payment reminders for
   outstanding balances.
 - **Rollback:** Correction via credit note + new charge — never an
@@ -292,14 +316,20 @@ UNKNOWN — REQUIRES EVIDENCE (see `01`).
 - **Trigger:** Chargeable event with an active insurance coverage on file.
 - **Actor:** Registration/billing staff, payer (via adapter).
 - **Preconditions:** Coverage record exists on the Patient's account.
-- **Steps:** Eligibility check → (if required) prior authorization →
-  service rendered → charge capture → coding attached → claim assembled →
-  claim submitted → adjudication → remittance posted → denial handling/
-  appeal if applicable → reconciliation.
-- **Data:** Coverage, Authorization, Claim, Remittance (Insurance/Claims
-  domains).
-- **Events:** EligibilityChecked, ClaimSubmitted, ClaimAdjudicated,
-  RemittancePosted.
+- **Steps:** Eligibility check (Insurance) → (if required) prior
+  authorization (Insurance) → service rendered → charge capture →
+  coding attached → claim assembled and submitted (Claims'
+  `AssembleClaim`→`SubmitClaim` — ACR-2: submission is owned by Claims,
+  not Insurance) → adjudication (Insurance consumes Claims'
+  `ClaimSubmitted`, tracks via `ClaimAdjudicated`) → remittance posted
+  (Insurance) → denial handling/appeal if applicable (Insurance, using
+  Claims' `ClaimDenied`) → reconciliation.
+- **Data:** Coverage, Authorization, Remittance (Insurance domain);
+  Claim, ClaimLine, DenialReason (Claims domain — Insurance no longer
+  owns the Claim entity itself, see ACR-2).
+- **Events:** EligibilityChecked, AuthorizationGranted/Denied,
+  ClaimAdjudicated, RemittancePosted (Insurance); ClaimAssembled,
+  ClaimSubmitted, ClaimDenied, ClaimPaid (Claims).
 - **Permissions:** Billing/coding staff for claim assembly and
   submission; finance for remittance reconciliation.
 - **External Integrations:** Per-payer adapter via Payer Adapter

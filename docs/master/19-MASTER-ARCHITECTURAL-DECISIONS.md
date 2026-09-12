@@ -345,6 +345,171 @@ Architecture & Migration Strategy)**
   event.
 - Rollback/Exit Strategy: N/A — no implementation occurred.
 
+**ADR-021 — Consent Ownership Reconciliation: Consent domain is sole write-owner (2026-09-08)**
+- Status: **PROPOSED**
+- Date: 2026-09-08
+- Context: A deep structural connectivity audit found `ConsentRecord`
+  independently owned by both PATIENT (`RecordConsent`/`ConsentChanged`)
+  and CONSENT (`CaptureConsent`/`WithdrawConsent`/`ConsentGranted`/
+  `ConsentWithdrawn`) in `03-MASTER-DOMAIN-MAP.md` — two non-overlapping
+  command/event vocabularies for the same entity, with no delegation
+  language in either direction. Recorded as ACR-1 in
+  `docs/audit/DEEP-CONNECTIVITY-RECONCILIATION.md` and
+  `docs/audit/ACR-RESOLUTION-OPTIONS.md`.
+- Decision: The repository owner selected Option A. CONSENT becomes the
+  sole owner of the consent write lifecycle. PATIENT retains only a
+  read-side delegation (`GetConsentStatus` reads through to CONSENT) and
+  no longer declares `ConsentRecord`, `RecordConsent`, or
+  `ConsentChanged` as its own.
+- Decision Provenance: This resolution (Option A) was explicitly
+  directed by the repository owner in the governing project
+  conversation for this repository. This is a record of that direction,
+  not a formal ADR approval — Status remains PROPOSED until the
+  repository owner (or whatever future mechanism `DECISION-AUTHORITY.md`
+  establishes) formally approves it through this document's own change
+  process.
+- Rationale: CONSENT already carried structured detail (`ConsentScope`,
+  `WithdrawalRecord`, explicit "checked by every domain... before any
+  external share" framing) that PATIENT's competing definition lacked.
+  Removing a two-command surface from PATIENT is a smaller, more
+  contained change than reproducing CONSENT's detail inside PATIENT.
+- Consequences: `03-MASTER-DOMAIN-MAP.md`'s PATIENT and CONSENT entries
+  updated to reflect this split. Workflow #1 (Patient Registration) in
+  `05-MASTER-WORKFLOW-MAP.md` was updated to replace its stale
+  Patient-owned consent reference (`ConsentRecord (Patient domain)`)
+  and event (`ConsentChanged`) with the correct Consent-domain
+  boundary (`CaptureConsent`/`ConsentGranted`).
+- Security/Operational/Compliance Impact: None negative — consolidates
+  consent enforcement (compliance-critical per `08`) into a single
+  domain instead of two competing surfaces, which reduces the risk of
+  one being checked while the other is bypassed.
+- Revisit Trigger: If a future implementation pass finds PATIENT's app
+  layer needs its own consent-write UI flow, that flow must still call
+  through to CONSENT's commands — it does not reopen this ADR.
+- Rollback/Exit Strategy: N/A — no implementation occurred; this is a
+  documentation-level correction of the target architecture only.
+
+**ADR-022 — Claim Ownership Reconciliation: Claims domain owns submission, Insurance retains adjudication/remittance (2026-09-08)**
+- Status: **PROPOSED**
+- Date: 2026-09-08
+- Context: The same audit found `Claim` independently owned by both
+  INSURANCE (`SubmitClaim`, `ClaimSubmitted`) and CLAIMS
+  (`SubmitClaim` — an identically named command — plus `AssembleClaim`/
+  `TrackStatus`, and `ClaimAssembled`/`ClaimSubmitted`/`ClaimDenied`/
+  `ClaimPaid`). CLAIMS's own Purpose line already described itself as
+  owning this sub-lifecycle "within Insurance," but INSURANCE's command
+  list was never updated to reflect that. Recorded as ACR-2.
+- Decision: The repository owner selected Option A, precisely scoped:
+  CLAIMS becomes sole owner of the claim submission lifecycle
+  (`Claim` entity, `SubmitClaim` command, `ClaimSubmitted` event).
+  INSURANCE explicitly **retains** eligibility, authorization,
+  adjudication (`ClaimAdjudicated` — which was never actually
+  duplicated between the two domains), and remittance reconciliation.
+- Decision Provenance: This resolution (Option A, with the precise
+  Insurance-retains-adjudication scoping) was explicitly directed by
+  the repository owner in the governing project conversation for this
+  repository. This is a record of that direction, not a formal ADR
+  approval — Status remains PROPOSED until the repository owner (or
+  whatever future mechanism `DECISION-AUTHORITY.md` establishes)
+  formally approves it through this document's own change process.
+- Rationale: `ClaimAdjudicated` was confirmed, on re-reading both
+  entries directly, to be uniquely an Insurance event — CLAIMS has
+  `ClaimDenied`/`ClaimPaid` as adjudication *outcomes*, not a
+  duplicate of `ClaimAdjudicated` itself. The only genuine duplicates
+  were the `Claim` entity, the `SubmitClaim` command, and the
+  `ClaimSubmitted` event — so the fix is narrower than a full split of
+  all claim-related responsibility, matching the owner's explicit
+  instruction that Insurance keeps adjudication.
+- Consequences: `03-MASTER-DOMAIN-MAP.md`'s INSURANCE and CLAIMS entries
+  updated. `05-MASTER-WORKFLOW-MAP.md` workflow #10 (Insurance & Claims)
+  updated to attribute the assemble/submit steps to Claims' commands and
+  the eligibility/authorization/adjudication/remittance steps to
+  Insurance's, where the prior text left this ambiguous.
+- Security/Operational/Compliance Impact: None negative — coding-attached
+  claim submission (compliance-critical for payer contracts per `03`'s
+  CLAIMS entry) stays exclusively in the domain built to enforce the
+  coding-discrepancy test (`03` CLAIMS Tests field), rather than being
+  reachable via two separate command surfaces with different guard rails.
+- Revisit Trigger: If Insurance's `GetClaimStatus` query (still present
+  in both INSURANCE and CLAIMS as a read-only query, not flagged as part
+  of this ACR) is found to diverge in behavior between the two domains
+  during implementation, that is a new finding requiring its own ADR —
+  it is explicitly out of scope for this one.
+- Rollback/Exit Strategy: N/A — documentation-level only.
+
+**ADR-023 — Payment Ownership Reconciliation: Payments owns the gateway transaction, Billing owns the ledger entry (2026-09-08)**
+- Status: **PROPOSED**
+- Date: 2026-09-08
+- Context: The same audit found BILLING independently declaring
+  `Payment`/`RecordPayment`/`PaymentReceived` with direct payment-gateway
+  integration, while PAYMENTS independently declared
+  `PaymentTransaction`/`RefundTransaction`/`CapturePayment`/`IssueRefund`/
+  `PaymentCaptured` with its own direct gateway integration, idempotency
+  handling, and PCI DSS tokenization detail BILLING lacked entirely. A
+  prior session pass had edited only `05`'s workflow narrative to assume
+  a delegation to Payments, without correcting `03`'s BILLING entry —
+  meaning the underlying domain-map conflict was never actually
+  resolved, only masked in one downstream document. Recorded as ACR-5
+  (originally surfaced as a Cloud #2-reported finding, independently
+  re-verified against `03` directly before this ADR was written).
+- Decision: The repository owner selected Option C — a two-layer split,
+  not a full removal of `Payment` from Billing. PAYMENTS owns
+  `PaymentTransaction`, `RefundTransaction`, all gateway interaction,
+  idempotency, and tokenization — the transaction lifecycle in full.
+  BILLING keeps `Payment` but redefined as a ledger/accounting posting
+  record only; `PaymentTransaction` and `Payment` are explicitly
+  declared distinct objects. PAYMENTS emits `PaymentCaptured`; BILLING
+  consumes that event and performs its own ledger posting
+  (`RecordPayment`) in reaction — Billing is explicitly prohibited from
+  being gateway-facing or a second source of truth for the transaction.
+- Decision Provenance: This resolution (Option C, the two-layer split)
+  was explicitly directed by the repository owner in the governing
+  project conversation for this repository. This is a record of that
+  direction, not a formal ADR approval — Status remains PROPOSED until
+  the repository owner (or whatever future mechanism
+  `DECISION-AUTHORITY.md` establishes) formally approves it through
+  this document's own change process.
+- Rationale: This preserves Billing's existing ledger/accounting
+  vocabulary (avoiding a wholesale rewrite of its financial-ledger
+  framing) while eliminating the actual defect — two domains each
+  claiming direct gateway ownership. Workflow #9 (Billing) in `05` was
+  updated to encode the Payments transaction boundary explicitly —
+  `PaymentCaptured` → Billing ledger posting, and the removal of
+  Billing's direct gateway role — since the workflow's prior text had
+  already (prematurely, and without this precise boundary) assumed some
+  form of Payments delegation.
+- Consequences: `03-MASTER-DOMAIN-MAP.md`'s BILLING and PAYMENTS entries
+  updated; `05-MASTER-WORKFLOW-MAP.md` workflow #9 (Billing) updated to
+  match the ledger/transaction split precisely (previously it read as
+  if already delegated, but without the ledger-vs-transaction
+  distinction this ADR establishes). A new Billing test was added
+  (`DENY any Billing code path that calls a payment gateway directly`)
+  mirroring the existing cross-domain-write guard-rail pattern already
+  used elsewhere in `03` (e.g. the AI/Clinical guard rail).
+- Security/Operational/Compliance Impact: Positive — narrows PCI DSS
+  scope to the Payments domain exclusively (Billing never touches
+  gateway or tokenized card detail), which is a cleaner compliance
+  boundary than either domain independently integrating the gateway.
+- Revisit Trigger: If a future implementation pass finds the
+  ledger-posting reaction to `PaymentCaptured` needs its own
+  idempotency handling distinct from Payments' (e.g. duplicate-event
+  delivery), that is a new, narrower architectural question — not a
+  reopening of this ADR's ownership split.
+- Residual/Revisit Note — Refunds: This ADR does not decide the exact
+  relationship between a Payments-domain refund transaction
+  (`RefundTransaction`/`IssueRefund`/`RefundIssued` — the actual gateway
+  refund) and a Billing-domain `CreditNote`/`IssueCreditNote`/
+  `CreditNoteIssued` (the accounting treatment). Both remain owned
+  exactly where they already were before this ADR — Payments owns the
+  refund transaction, Billing owns the credit note — and this ADR does
+  not assert, require, or imply any fixed mapping in either direction
+  (e.g. `RefundIssued` does not automatically produce a
+  `CreditNoteIssued`, nor does a `CreditNote` imply a
+  `RefundTransaction`). Whether and how these two should be linked is
+  an open semantic question for a future decision, not resolved here.
+- Rollback/Exit Strategy: N/A — documentation-level only; no
+  implementation occurred.
+
 ## Alternatives Considered
 Each ADR above already documents its own alternative(s) inline — this
 document does not duplicate them a second time.

@@ -88,6 +88,9 @@ stated plainly, once, here — individual tables below do not repeat
 | ADR-018 | FHIR production baseline corrected to R4/R4B | **PROPOSED (new, 2026-08-27)** |
 | ADR-019 | Reconciliation with ADR-000 (staged-evolution strategy); Phase 1 has no fired trigger | **PROPOSED (new, 2026-08-27)** |
 | ADR-020 | Deliberate freeze exception: Gap Analysis pass (2026-09-02), logged not silent | **PROPOSED (new, 2026-09-02)** |
+| ADR-021 | Consent ownership: Consent domain sole write-owner, Patient read-side delegation only | **PROPOSED (new, 2026-09-08)** |
+| ADR-022 | Claim ownership: Claims owns submission lifecycle, Insurance retains adjudication/remittance | **PROPOSED (new, 2026-09-08)** |
+| ADR-023 | Payment ownership: Payments owns the gateway transaction, Billing owns the ledger entry only | **PROPOSED (new, 2026-09-08)** |
 
 ### Technology Component Status Board (`14-MASTER-TECHNOLOGY-STACK.md`)
 | Category | Confidence | Status |
