@@ -81,7 +81,7 @@ stated plainly, once, here — individual tables below do not repeat
 | ADR-011 | Tiered documentation depth (Domain/Workflow Map) | PROPOSED |
 | ADR-012 | RPO/RTO targets deferred pending sign-off | PROPOSED |
 | ADR-013 | NFR targets sourced from vision material, labeled unmeasured | PROPOSED |
-| ADR-014 | Java/Spring/PostgreSQL stack baseline, unreconciled against prior decisions | PROPOSED |
+| ADR-014 | Java/Spring/PostgreSQL stack baseline | **RESOLVED by ADR-019 (2026-08-27)** |
 | ADR-015 | Digital provisioning ≠ legal/regulatory approval | PROPOSED |
 | ADR-016 | Messaging: Pub/Sub primary, RabbitMQ conditional, Kafka rejected | **PROPOSED (new, 2026-08-27)** |
 | ADR-017 | IaC: OpenTofu replaces Terraform | **PROPOSED (new, 2026-08-27)** |
