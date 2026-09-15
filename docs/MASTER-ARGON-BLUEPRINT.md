@@ -213,6 +213,14 @@ Production Hardening/Evidencing continuous throughout —
 Visual Architecture section; all diagrams above and below are drawn
 consistently with the three-plane model in `01`)*
 
+> **Detailed companion document:** `docs/MASTER-ARGON-OPERATIONAL-FLOWS.md`
+> is the full detailed visual/navigation reference for system flow and
+> lifecycle — organization provisioning, facility model, actor map, the
+> complete patient journey, and the corrected Billing/Claims/Insurance/
+> Payments boundary (ACR-1/2/3/5, ADR-021/022/023). This file remains the
+> umbrella synthesis; that file is the detailed operational companion, not
+> a competing source of truth.
+
 ### Pharmacy
 ```
 OrderPlaced (Clinical)
