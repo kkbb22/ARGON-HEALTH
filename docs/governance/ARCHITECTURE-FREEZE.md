@@ -12,19 +12,24 @@ frozen baseline may change going forward.
 ## What Is Frozen
 Everything under `docs/master/`, `docs/MASTER-ARGON-BLUEPRINT.md`,
 `docs/governance/`, `docs/adr/`, `docs/compliance/`,
-`docs/interoperability/`, as of local commit `dd994c3` and the
-documents added in this closing pass
-(`docs/governance/ARCHITECTURE-FREEZE.md`,
-`docs/audit/FINAL-ARCHITECTURE-COMPLETENESS.md`). This is a
+`docs/interoperability/`, as of canonical commit `21a170f` ("Final
+Consolidation: Apply newest updates, clean duplicates, and freeze
+architecture", 2026-09-05) — the commit in which this document and
+`docs/audit/FINAL-ARCHITECTURE-COMPLETENESS.md` were first published,
+and therefore the first commit at which this freeze was in force. (This
+line previously cited pre-consolidation local commit `dd994c3`, which
+does not exist in this repository and cannot be resolved; `21a170f` is
+the published commit carrying the same closing-pass state.) This is a
 **documentation and governance freeze**, not a code freeze — no code
 exists yet to freeze.
 
 ## What Freezing Means
 - No document above is edited for style, preference, or "improvement"
   without following the Change Process below.
-- The 19 ADRs in `docs/master/19-MASTER-ARCHITECTURAL-DECISIONS.md` plus
-  the 2 standalone ADRs in `docs/adr/` represent the complete, current
-  decision set. All remain **PROPOSED** — freezing the baseline does
+- The 23 ADRs in `docs/master/19-MASTER-ARCHITECTURAL-DECISIONS.md`
+  (ADR-001..ADR-023; ADR-000 is referenced there but owned externally)
+  plus the 2 standalone ADRs in `docs/adr/` represent the complete,
+  current decision set. All remain **PROPOSED** — freezing the baseline does
   **not** approve any ADR; approval is a separate, human decision.
 - **ADR-019's authority is unaffected and unweakened by this freeze**:
   every phase of `docs/master/20-MASTER-IMPLEMENTATION-ROADMAP.md`

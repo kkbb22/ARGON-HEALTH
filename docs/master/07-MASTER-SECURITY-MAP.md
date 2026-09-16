@@ -198,7 +198,10 @@ standard — status tracking lives exclusively in `08`.
 - A break-glass invocation with no follow-up audit review within a
   defined window is itself treated as a security incident.
 - RLS misconfiguration on a new table is a release-blocking defect, not a
-  follow-up ticket (see `31` Release workflow gating).
+  follow-up ticket (gate defined in `15-MASTER-TESTING-STRATEGY.md`
+  §Quality Gate, which blocks any release wave in `05` §12 from
+  proceeding past canary without the full Security/Authorization/RLS/
+  Tenant Isolation ALLOW+DENY suite passing).
 
 ## Dependencies
 Depends on `01`, `02`, `03`, `04`. Feeds `08`, `09` (Control Plane

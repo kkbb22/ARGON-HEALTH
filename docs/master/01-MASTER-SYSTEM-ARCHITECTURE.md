@@ -66,8 +66,8 @@ ARGON is decomposed into three planes plus one cross-cutting boundary:
 
 **Control Plane** — owns the platform itself: who exists, what they're
 licensed for, what version they're running, whether they're healthy. It
-never touches clinical content directly (see `27` in the security map for
-the Control-Plane-vs-Clinical-Access separation).
+never touches clinical content directly (see `07-MASTER-SECURITY-MAP.md`
+§Control Plane Security — Structural Separation).
 
 **Application Plane** — owns clinical and operational behavior: every domain
 a clinician, pharmacist, biller, or patient actually interacts with.
@@ -99,8 +99,8 @@ layer so a single choke point can be audited, rate-limited, and versioned.
 ## Security Impact
 Three-plane separation is itself a security control: it makes "platform
 administrator" and "clinical data access" structurally different privilege
-domains (elaborated in `07-MASTER-SECURITY-MAP.md` and `27` Control Plane
-Security). A design that merges the planes would make privilege escalation
+domains (elaborated in `07-MASTER-SECURITY-MAP.md` §Control Plane
+Security — Structural Separation). A design that merges the planes would make privilege escalation
 from platform-ops to PHI-access a single-role problem instead of a two-step,
 auditable one.
 

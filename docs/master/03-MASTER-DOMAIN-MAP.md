@@ -285,7 +285,7 @@ Definition of Done
   acquisition; radiologist for report finalization and addenda.
 - **Dependencies:** Platform, Identity, Organization, Patient, Clinical.
 - **External Integrations:** PACS via DICOM/DICOMweb — image binaries never
-  transit or land in PostgreSQL (see `01`, `23`).
+  transit or land in PostgreSQL (see `01`, `04`, and ADR-005 in `19`).
 - **Data Classification:** PHI; imaging binaries classified separately from
   the structured report for storage-tier purposes.
 - **Audit Requirements:** Every study access and report finalization
@@ -455,10 +455,11 @@ Definition of Done
 - **Events:** ProvisioningStepCompleted, ReleaseWaveStarted,
   ReleaseRolledBack, IncidentDeclared, IncidentResolved.
 - **APIs:** Control-Plane-operator-only API surface — structurally
-  separate from every Application-Plane API (see `27`).
+  separate from every Application-Plane API (see `07` §Control Plane
+  Security — Structural Separation).
 - **Permissions:** Platform operator role, distinct from any clinical
   role; high-risk operations require step-up MFA + documented reason
-  (see `27`).
+  (see `07` §Control Plane Security — Structural Separation).
 - **Dependencies:** Platform (this domain effectively owns Platform's
   write side).
 - **External Integrations:** None directly.
@@ -849,7 +850,7 @@ compliance officer role. Dependencies: Audit, Control Plane. External
 Integrations: none. Data Classification: internal/governance. Audit: every
 status change logged with evidence reference. Failure Modes: status must
 never jump directly from IMPLEMENTED to APPROVED without a TESTED/
-EVIDENCED step (see `33` rule in the original prompt). Tests: DENY status
+EVIDENCED step (see ADR-009 in `19`). Tests: DENY status
 transition that skips a required intermediate state. Compliance: this
 domain IS the compliance system — see `08` for full detail. DoD: no
 compliance claim exists in any other document without a corresponding
@@ -907,7 +908,8 @@ summary. Failure Modes: a recommendation must never auto-apply to the
 clinical record — clinician action is always required. Tests: DENY any
 code path where an AI recommendation writes directly to Clinical without
 clinician confirmation. Compliance: IEC 62304/ISO 14971 applicability is
-UNKNOWN — REQUIRES EVIDENCE based on final feature classification (`21`).
+UNKNOWN — REQUIRES EVIDENCE based on final feature classification
+(`07` §Security Standard Baseline).
 DoD: every AI-influenced clinical action has a human-confirmation step in
 its event trail.
 
