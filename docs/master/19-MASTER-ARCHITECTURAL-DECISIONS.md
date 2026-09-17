@@ -510,6 +510,182 @@ Architecture & Migration Strategy)**
 - Rollback/Exit Strategy: N/A — documentation-level only; no
   implementation occurred.
 
+**ADR-024 — Object Storage Retrieval Credential Boundary (2026-09-16)**
+- Status: **PROPOSED**
+- Date: 2026-09-16
+- Decision Question: May ARGON issue an object-storage retrieval
+  credential that is redeemable outside ARGON's own authorization
+  boundary (i.e., checked and honored by the storage provider directly,
+  without a request reaching an ARGON-controlled service at redemption
+  time)?
+- Context: `03` DOCUMENTS already owns access-controlled retrieval
+  (`Retrieve`), depends on both Object Storage and Consent, and
+  requires every retrieval logged with denial outside the owning
+  record's access scope. `03` RADIOLOGY defines the imaging lifecycle
+  (`PlaceImagingOrder`, `ScheduleStudy`, `AcquireImages`,
+  `FinalizeReport`, `FlagCriticalFinding`) and requires "every study
+  access... audited," but currently declares no retrieval command or
+  query and no dependency on Documents or Consent — the audit
+  requirement has no operation to attach to. `04` places DICOM
+  instances in object storage rather than PostgreSQL. `06` establishes
+  the Interoperability Layer, including a DICOMweb Gateway, as the sole
+  choke point for external protocol traffic. `07` establishes
+  workload-scoped service identity (no static service keys) and the
+  application → authorization service → RLS model, and separately
+  states that session revocation is server-side and takes effect
+  immediately rather than at next token expiry — a property stated for
+  sessions, not evaluated here for storage credentials. `13` names Cloud
+  SQL and Memorystore as never publicly reachable within the private
+  network, and lists Cloud Storage as an infrastructure component
+  without including it in that same network-boundary statement — an
+  omission, not a stated decision either way. No document in this
+  repository specifies a mechanism by which retrieval credentials are
+  issued, delivered, or redeemed for protected object-storage content.
+- Options Considered:
+  - **Option A — Provider-native signed URL.** The storage provider
+    validates and redeems the credential directly; ARGON is not on the
+    path at redemption time. Cannot consult ARGON consent state at
+    redemption. Revocation is bounded by credential expiry, not
+    immediate. Avoids routing binary transfer through the application
+    tier, which matters at DICOM study scale (many instances per
+    study).
+  - **Option B — Opaque application-mediated credential.** Redemption
+    is a request to an ARGON-controlled service, which can check
+    consent state and authorization at redemption time and revoke
+    before expiry. Still requires a delivery mechanism for the
+    underlying bytes, and does not by itself resolve DICOM study-scale
+    transfer.
+  - **Option C — Authenticated application proxy/stream.** Every byte
+    of every retrieval passes through an ARGON-controlled service.
+    Strongest redemption-time enforcement; the application tier carries
+    the full bandwidth of every retrieval, including full DICOM
+    studies.
+  - **Option D — Hybrid.** Different content classes or risk levels use
+    different options above. Consequences depend entirely on which
+    content maps to which option, which this ADR does not specify.
+  - This document evaluates architectural consequences only; it does
+    not rank the options by preference, cost, or convenience.
+- Architecturally Achievable Security Properties by Option (this table
+  describes what each option would make architecturally possible if
+  built, not what is already implemented — no object-storage credential
+  mechanism exists yet; see Rollback/Exit Strategy below):
+
+  | Property | A | B | C | D |
+  |---|---|---|---|---|
+  | Tenant isolation | UNKNOWN | PRESENT | PRESENT | depends on split |
+  | Authorization enforcement at redemption | MISSING | PRESENT | PRESENT | depends on split |
+  | Consent-state enforcement at redemption | MISSING | PRESENT | PRESENT | depends on split |
+  | Revocation before expiry | MISSING | PRESENT | PRESENT | depends on split |
+  | Replay resistance | UNKNOWN | PRESENT | PRESENT | depends on split |
+  | Object enumeration resistance | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN |
+  | Audit visibility at actual access | MISSING (issuance only) | PRESENT | PRESENT | depends on split |
+  | Credential leakage exposure | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN |
+  | DICOM study-scale viability | REQUIRES MEASUREMENT | REQUIRES MEASUREMENT | REQUIRES MEASUREMENT | REQUIRES MEASUREMENT |
+  | Direct object-store exposure | inherent to the mechanism | avoidable | avoided | depends on split |
+
+  No entry above reflects a control this repository does not already
+  describe elsewhere or a control invented for this ADR. Tenant
+  isolation and replay resistance for Option A are marked UNKNOWN rather
+  than assessed, because no document in this repository addresses
+  either property for a provider-native signed credential — the
+  repository's replay-related evidence (refresh-token reuse detection,
+  event-processing idempotency) concerns different mechanisms entirely.
+  Credential leakage exposure is marked UNKNOWN across all options for
+  the same reason: no document establishes a measurable basis for
+  comparing leakage risk between a bearer URL, an opaque token, and a
+  proxy session. DICOM study-scale viability is marked REQUIRES
+  MEASUREMENT across all options, since no transfer-duration or
+  instance-count data exists in this repository to support even a
+  qualitative comparison; `06`'s Interoperability Layer establishes
+  that a DICOMweb Gateway exists, but not how it performs at scale
+  under any of these options. Object enumeration resistance remains
+  UNKNOWN for all options, as before.
+- Direct Access Clarification: Under every option, the *initial*
+  authorization request — deciding whether this identity, for this
+  tenant, may access this object at all — occurs through ARGON's
+  authorization service. The options diverge after that point. Under
+  Option A, once the signed credential is issued, *redemption* (the
+  actual retrieval of bytes) is handled directly by the storage
+  provider — outside ARGON's authorization boundary, with no further
+  ARGON-controlled check between issuance and delivery. Under Options B
+  and C, redemption itself is a request to an ARGON-controlled service,
+  so ARGON's authorization boundary extends through to the moment of
+  access, not merely to issuance. "Cloud Storage is an
+  internet-addressable service" does not by itself mean unauthorized
+  clients can reach protected content directly — that initial check
+  exists under every option. The architectural question this ADR
+  presents is precisely whether allowing redemption to occur outside
+  ARGON's boundary (as in Option A) is acceptable for this content
+  class, or whether redemption must remain inside it (as in Options B
+  and C).
+- Decision (PROPOSED): Protected object-storage retrieval credentials
+  must not be redeemable outside an ARGON-controlled authorization
+  boundary. Option A (provider-native signed URL, redeemed directly by
+  the storage provider with no further ARGON-controlled checkpoint) is
+  therefore not permitted for protected content. This preserves the
+  ability to enforce authorization and consent-related checks at the
+  moment of redemption, not only at issuance — the property Option A
+  cannot provide (see Security Properties by Option, above). This
+  decision selects the authorization-boundary requirement only. It does
+  **not** select a byte-delivery mechanism: whether the specific
+  implementation is Option B (opaque application-mediated credential),
+  Option C (authenticated proxy/stream), or a hybrid, and whether
+  underlying bytes are proxied through the application tier in full or
+  delivered by some other ARGON-controlled means, remains a separate
+  implementation/design question subject to DICOM-scale performance
+  measurement (see Security Properties by Option, "DICOM study-scale
+  viability: REQUIRES MEASUREMENT," and Explicitly Out of Scope, below).
+  `authorization-boundary control under ARGON` and `mandatory full
+  application-tier byte proxying` are two different questions; this
+  decision resolves only the first.
+- Decision Provenance: Repository-owner directed. The direction above
+  reflects the repository owner's proposed decision, communicated
+  directly, not an AI-selected recommendation. Per
+  `docs/governance/DECISION-AUTHORITY.md`, an owner-directed proposal
+  does not constitute approval: this ADR remains **PROPOSED** until the
+  formal approval process in `docs/governance/ARCHITECTURE-FREEZE.md`
+  is completed, and no implementation has started or is authorized by
+  this entry.
+- Explicitly Out of Scope for This ADR (deferred, not decided here):
+  credential lifetime/TTL (an implementation parameter subject to
+  future measurement, not fixed by this document); the required
+  business/legal revocation latency after `ConsentWithdrawn` (a
+  business/legal decision, not an architectural one); object-version
+  retention, anonymization-vs-erasure interaction, and legal-hold
+  interaction for versioned object storage (a separate, later
+  decision); the exact byte-delivery mechanism and DICOM transfer
+  performance (implementation/design questions subject to measurement,
+  to be resolved within the boundary this ADR sets — not by this ADR
+  itself); and the specific mechanism by which RADIOLOGY's "every
+  study access audited" requirement gains a retrieval operation to
+  attach to (an implementation/design consequence of whichever
+  delivery mechanism is selected, requiring its own subsequent
+  controlled resolution — not a new domain, workflow, or ownership
+  assignment made by this ADR).
+- Security/Operational/Compliance Impact: This ADR performs no
+  implementation and changes no control by itself — no credential
+  mechanism exists yet, so nothing in production is affected by this
+  document alone. That is a statement about this document's own
+  effect, not about the underlying question: the asymmetry it records
+  (object storage lacking both the RLS backstop and the private-network
+  treatment that PostgreSQL and Redis have) is a real, currently open
+  security boundary, and RADIOLOGY's "every study access audited"
+  requirement currently has no operation to attach to. Selecting an
+  option is what will change a control; recording the decision here is
+  what makes that future change subject to the same owner-approval
+  process as any other frozen-baseline change, rather than an implicit
+  default.
+- Revisit Trigger: Option A is no longer available under this ADR; the
+  authorization-boundary principle is decided. The remaining
+  implementation/design space is Option B, Option C, or a hybrid
+  compatible with that principle. This entry remains open until a
+  specific byte-delivery mechanism is selected within that space, which
+  requires DICOM-scale measurement (see Security Properties by Option,
+  "DICOM study-scale viability: REQUIRES MEASUREMENT") where
+  performance evidence bears on the choice.
+- Rollback/Exit Strategy: N/A — no implementation occurred; this is a
+  documentation-level decision record only.
+
 ## Alternatives Considered
 Each ADR above already documents its own alternative(s) inline — this
 document does not duplicate them a second time.
