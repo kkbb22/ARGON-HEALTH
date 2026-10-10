@@ -180,7 +180,7 @@ class Fixture:
         for rel, text in self.files.items():
             p = self.root / rel
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(text, encoding='utf-8')
+            p.write_bytes(text.encode('utf-8'))
         # Evidence hashes follow the (possibly mutated) artifact content unless a test pinned a wrong one.
         for path, fields, rows in [
             (module.MATRIX, module.MATRIX_FIELDS, self.matrix),
