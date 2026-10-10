@@ -1,1 +1,1 @@
-period_id,environment,period_start,period_end,decision,operations_reviewer,security_reviewer,clinical_reviewer,privacy_legal_reviewer,evidence_id,next_review,notes
+period_id,environment,period_start,period_end,decision,operations_reviewer,security_reviewer,clinical_reviewer,privacy_legal_reviewer,evidence_id,next_review,notes,release_id

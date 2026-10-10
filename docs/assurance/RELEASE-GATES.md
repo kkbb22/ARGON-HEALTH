@@ -82,3 +82,5 @@ A release gate may report only the scope and build it examined. It does not cert
 ## Sign-off policy
 
 The included `RELEASE-SIGNOFF.csv` is intentionally empty. A row must refer to one exact release candidate and environment. All roles required for the actual scope must sign. For a genuinely non-applicable sign-off, provide a linked specialist determination instead of silently omitting the field. The included script enforces all sign-off columns for G4 as a conservative default; modify only through an approved governance change.
+
+The exact checks the script applies to G4 and G5 (commit and artifact binding, rollback plan structure, release-bound evidence, revalidation dates) are documented in [G4/G5 gate rules](G4-G5-GATE-RULES.md).
