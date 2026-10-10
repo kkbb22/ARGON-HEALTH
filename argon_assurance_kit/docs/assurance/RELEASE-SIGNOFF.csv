@@ -1,1 +1,0 @@
-release_id,environment,gate,decision,decision_owner,commit_sha,artifact_digest,configuration_version,migration_version,scope,rollback_plan_path,qa_signoff,security_signoff,clinical_signoff,privacy_legal_signoff,operations_signoff,recorded_utc,valid_until,notes
